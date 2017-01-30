@@ -1,0 +1,19 @@
+#! /bin/csh -f
+
+### Change these to your own site and user directory! 
+### You will need to create a Makefile Macro in bld/ and a run_ice script 
+### in input_templates/.
+setenv SITE NOAA.zeus   # also works for mustang
+#setenv SITE LANL.bigsuze
+
+### SYSTEM_USERDIR is predefined on ORNL machines
+setenv SYSTEM_USERDIR /home/Anthony.Craig/lanl_cice  # conejo
+#setenv SYSTEM_USERDIR /Users/akt/Work/MPAS-CICE/Column_Package/cice_package/run_dirs
+
+### Set SRCDIR and EXEDIR to your own paths!
+setenv SRCDIR /home/Anthony.Craig/lanl_cice  # conejo
+#setenv SRCDIR /Users/akt/Work/MPAS-CICE/Column_Package/cice_package/cice
+
+setenv EXEDIR /home/Anthony.Craig/lanl_cice
+
+./comp_ice.backend

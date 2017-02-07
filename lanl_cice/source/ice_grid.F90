@@ -412,7 +412,9 @@
 
       call makemask          ! velocity mask, hemisphere masks
 
+#ifndef CICE_TLATLON
       call Tlatlon           ! get lat, lon on the T grid
+#endif
 
       !----------------------------------------------------------------
       ! Corner coordinates for CF compliant history files
@@ -657,7 +659,23 @@
                           field_loc_NEcorner, field_type_scalar)
       call ice_HaloExtrapolate(ULON, distrb_info, &
                                ew_boundary_type, ns_boundary_type)
+#ifdef CICE_TLATLON
+      fieldname='tlat'
+      call ice_read_global_nc(fid_grid,5,fieldname,work_g1,diag) ! TLAT
+      call gridbox_verts(work_g1,latt_bounds)       
+      call scatter_global(TLAT, work_g1, master_task, distrb_info, &
+                          field_loc_NEcorner, field_type_scalar)
+      call ice_HaloExtrapolate(TLAT, distrb_info, &
+                               ew_boundary_type, ns_boundary_type)
 
+      fieldname='tlon'
+      call ice_read_global_nc(fid_grid,6,fieldname,work_g1,diag) ! TLON
+      call gridbox_verts(work_g1,lont_bounds)       
+      call scatter_global(TLON, work_g1, master_task, distrb_info, &
+                          field_loc_NEcorner, field_type_scalar)
+      call ice_HaloExtrapolate(TLON, distrb_info, &
+                               ew_boundary_type, ns_boundary_type)
+#endif
       fieldname='angle'
       call ice_read_global_nc(fid_grid,7,fieldname,work_g1,diag) ! ANGLE    
       call scatter_global(ANGLE, work_g1, master_task, distrb_info, &

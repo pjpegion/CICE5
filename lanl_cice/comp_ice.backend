@@ -13,6 +13,7 @@
 #setenv RES gx1 ; setenv GRID 320x384
 #setenv RES tx1 ; setenv GRID 360x240
 #setenv RES mx5 ; setenv GRID 720x410
+#setenv RES mx2 ; setenv GRID 1500x1099
 
 setenv RES nx1
 echo "NEMS_GRID = $NEMS_GRID "
@@ -23,6 +24,7 @@ if ($?NEMS_GRID) then
   if ($NEMS_GRID =~ *gx1*) setenv RES gx1
   if ($NEMS_GRID =~ *tx1*) setenv RES tx1
   if ($NEMS_GRID =~ *mx5*) setenv RES mx5
+  if ($NEMS_GRID =~ *mx2*) setenv RES mx2
 endif
 
 if ($RES == col) setenv GRID 5x5
@@ -31,6 +33,7 @@ if ($RES == nx1) setenv GRID 360x200
 if ($RES == gx1) setenv GRID 320x384
 if ($RES == tx1) setenv GRID 360x240
 if ($RES == mx5) setenv GRID 720x410
+if ($RES == mx2) setenv GRID 1500x1099
 
 echo "tcx comp_ice.backend res grid $RES $GRID"
 
@@ -76,6 +79,14 @@ if ($RES == 'mx5') then   # for column configuration:
    setenv NSNWLYR    1       # number of vertical layers in the snow
    setenv NICECAT    5       # number of ice thickness categories
 endif
+if ($RES == 'mx2') then   # for column configuration:
+   setenv NTASK     20       # total number of processors
+   setenv BLCKX    150       # x-dimension of blocks ( not including )
+   setenv BLCKY    550       # y-dimension of blocks (  ghost cells  )
+   setenv NICELYR    7       # number of vertical layers in the ice
+   setenv NSNWLYR    1       # number of vertical layers in the snow
+   setenv NICECAT    5       # number of ice thickness categories
+endif
 
 # may need to increase MXBLCKS with rake distribution or padding
 @ a = $NXGLOB * $NYGLOB ; @ b = $BLCKX * $BLCKY * $NTASK  
@@ -102,7 +113,7 @@ setenv SHRDIR   csm_share # location of CCSM shared code
 if !($?IO_TYPE) then
   setenv IO_TYPE  netcdf4   # set to none if netcdf library is unavailable
   # setenv IO_TYPE  netcdf3   # set to none if netcdf library is unavailable
-                            # set to pio for parallel netcdf
+  # setenv IO_TYPE  pio    # set to pio for parallel netcdf
 endif
 
 setenv DITTO    no        # reproducible diagnostics

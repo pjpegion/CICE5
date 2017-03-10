@@ -15,8 +15,8 @@
 #setenv RES mx5 ; setenv GRID 720x410
 #setenv RES mx2 ; setenv GRID 1500x1099
 
-#setenv RES nx1
 setenv RES mx2
+setenv NEMS_GRID T126_mx2
 echo "NEMS_GRID = $NEMS_GRID "
 if ($?NEMS_GRID) then
   if ($NEMS_GRID =~ *col*) setenv RES col

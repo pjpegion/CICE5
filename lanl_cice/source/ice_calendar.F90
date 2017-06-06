@@ -196,6 +196,7 @@
          elapsed_days               , & ! since beginning this run
          elapsed_months             , & ! since beginning this run
          elapsed_hours              , & ! since beginning this run
+         elapsed_secs              , & ! since beginning this run
          month0
 
       nyrp=nyr
@@ -226,6 +227,7 @@
       elapsed_months = (nyr - 1)*12 + (month - month0)
       elapsed_days = int((istep * dt) / secday)
       elapsed_hours = int(ttime/3600)
+      elapsed_secs = int(istep * dt)
 
       idate = (nyr+year_init-1)*10000 + month*100 + mday ! date (yyyymmdd) 
 
@@ -284,7 +286,8 @@
           if (new_day   .and. mod(elapsed_days, dumpfreq_n)==0) &
                 write_restart = 1
         case ("s", "S")
-          if (mod(int(ttime), dumpfreq_n)==0) &
+!         if (mod(int(ttime), dumpfreq_n)==0) &
+          if (mod(elapsed_secs,dumpfreq_n)==0) &
                 write_restart = 1
         end select
       

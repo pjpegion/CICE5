@@ -390,9 +390,10 @@ module cice_cap_mod
     call ESMF_GridAddItem(gridIn, itemFlag=ESMF_GRIDITEM_MASK, itemTypeKind=ESMF_TYPEKIND_I4, &
        staggerLoc=ESMF_STAGGERLOC_CENTER, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
-    call ESMF_GridAddItem(gridIn, itemFlag=ESMF_GRIDITEM_AREA, itemTypeKind=ESMF_TYPEKIND_R8, &
-       staggerLoc=ESMF_STAGGERLOC_CENTER, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+!commented out to remove Area from Grid
+!   call ESMF_GridAddItem(gridIn, itemFlag=ESMF_GRIDITEM_AREA, itemTypeKind=ESMF_TYPEKIND_R8, &
+!      staggerLoc=ESMF_STAGGERLOC_CENTER, rc=rc)
+!   if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
 
     do iblk = 1,nblocks
        DE = iblk-1
@@ -425,10 +426,11 @@ module cice_cap_mod
            staggerloc=ESMF_STAGGERLOC_CENTER, &
            farrayPtr=gridmask, rc=rc)
        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
-       call ESMF_GridGetItem(gridIn, itemflag=ESMF_GRIDITEM_AREA, localDE=DE, &
-           staggerloc=ESMF_STAGGERLOC_CENTER, &
-           farrayPtr=gridarea, rc=rc)
-       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+!commented out to remove Area from Grid
+!      call ESMF_GridGetItem(gridIn, itemflag=ESMF_GRIDITEM_AREA, localDE=DE, &
+!          staggerloc=ESMF_STAGGERLOC_CENTER, &
+!          farrayPtr=gridarea, rc=rc)
+!      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
 
        do j1 = lbnd(2),ubnd(2)
        do i1 = lbnd(1),ubnd(1)
@@ -437,7 +439,7 @@ module cice_cap_mod
           coordXcenter(i1,j1) = TLON(i,j,iblk) * rad_to_deg
           coordYcenter(i1,j1) = TLAT(i,j,iblk) * rad_to_deg
           gridmask(i1,j1) = nint(hm(i,j,iblk))
-          gridarea(i1,j1) = tarea(i,j,iblk)
+!         gridarea(i1,j1) = tarea(i,j,iblk)
        enddo
        enddo
 

@@ -1,0 +1,71 @@
+#==============================================================================
+# Makefile macros for "gaea" Cray at NOAA, located at ORNL 
+#==============================================================================
+# For use with intel compiler
+#==============================================================================
+
+INCLDIR    := -I. 
+SLIBS      := 
+ULIBS      := 
+CPP        := fpp
+CPPFLAGS   := -P 
+CPPDEFS    := -DFORTRANUNDERSCORE -DNO_R16 -DHAVE_F2008_CONTIGUOUS -DLINUX -DCPRINTEL -DCICE_NEMS
+CFLAGS     := -c -O2 -fp-model precise -xCORE-AVX2 -g -traceback
+
+# WCOSS CPPDEFS    := -DFORTRANUNDERSCORE -DNO_R16 -DHAVE_F2008_CONTIGUOUS -DLINUX -DCPRINTEL -DCICE_NEMS
+# WCOSS CFLAGS     := -c -O2 -fp-model precise -xHost
+
+ifeq ($(COMMDIR), mpi)
+   FC         :=  ftn 
+else
+   FC         :=  ifort
+endif
+
+MPICC:= cc
+
+MPIFC:= ftn
+LD:= $(MPIFC)
+
+FIXEDFLAGS   := -132
+FREEFLAGS    := -free
+# WORKS past 1050 FFLAGS       := -O2 -fp-model precise -convert big_endian -assume byterecl -ftz -g -traceback -xCORE-AVX2 
+# WORKS past 1050 
+FFLAGS       := -O2 -fp-model precise -convert big_endian -assume byterecl -ftz -g -traceback -xCORE-AVX2 
+# CRASHED at 828 maybe MOM5 setting though -  FFLAGS       := -O2 -fp-model precise -convert big_endian -assume byterecl -ftz -g -traceback -xCORE-AVX2 -align array32byte
+
+# WCOSS FFLAGS     := -O2 -fp-model precise -convert big_endian -assume byterecl -ftz -traceback -xHost
+
+
+FFLAGS_NOOPT := -O0
+
+ifeq ($(THRD), yes)
+   FFLAGS  :=  $(FFLAGS) -openmp
+endif
+
+LD         := $(FC)
+LDFLAGS    := $(FFLAGS) -v
+
+    CPPDEFS :=  $(CPPDEFS) -DNXGLOB=$(NXGLOB) -DNYGLOB=$(NYGLOB) \
+                -DBLCKX=$(BLCKX) -DBLCKY=$(BLCKY) -DMXBLCKS=$(MXBLCKS) \
+                -DNICELYR=$(NICELYR) -DNSNWLYR=$(NSNWLYR) -DNICECAT=$(NICECAT) \
+                -DTRAGE=$(TRAGE) -DTRFY=$(TRFY) -DTRLVL=$(TRLVL) -DTRPND=$(TRPND) \
+                -DTRBRI=$(TRBRI) -DNTRAERO=$(NTRAERO) -DNBGCLYR=$(NBGCLYR) \
+                -DTRBGCS=$(TRBGCS) -DNUMIN=$(NUMIN) -DNUMAX=$(NUMAX)
+
+ifeq ($(DITTO), yes)
+   CPPDEFS :=  $(CPPDEFS) -DREPRODUCIBLE
+endif
+
+ifeq ($(IO_TYPE), netcdf3)
+   CPPDEFS :=  $(CPPDEFS) -Dncdf
+   INCLDIR := $(INCLDIR) -I$(NETCDF)/include
+   SLIBS   := $(SLIBS) -L$(NETCDF)/lib -lnetcdf
+endif
+
+ifeq ($(IO_TYPE), netcdf4)
+   CPPDEFS :=  $(CPPDEFS) -Dncdf
+   INCLDIR := $(INCLDIR) -I$(NETCDF)/include
+   SLIBS   := $(SLIBS) -L$(NETCDF)/lib -lnetcdff -lnetcdf -lnetcdf_c++
+   SLIBS   := $(SLIBS) -L$(HDF5)/lib -lhdf5_hl -lhdf5 -L/usrx/local/prod/zlib/1.2.7/intel/sandybridge/lib -lz
+endif
+

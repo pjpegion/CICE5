@@ -6,11 +6,11 @@
 
 CPP        := fpp
 CPPDEFS    := -DFORTRANUNDERSCORE -DNO_R16 -DHAVE_F2008_CONTIGUOUS -DLINUX -DCPRINTEL -DCICE_NEMS
-CFLAGS     := -c -O2 -fp-model precise -xHost
+CFLAGS     := -c -O2 -fp-model precise -xHost -g -traceback
 
 FIXEDFLAGS := -132
 FREEFLAGS  := -FR
-FFLAGS     := -O2 -fp-model precise -convert big_endian -assume byterecl -ftz -traceback -xHost
+FFLAGS     := -O2 -fp-model precise -convert big_endian -assume byterecl -ftz -traceback -xHost -g -traceback
 FFLAGS_NOOPT:= -O0
 
 ifeq ($(COMMDIR), mpi)

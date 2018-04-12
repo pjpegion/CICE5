@@ -1,4 +1,4 @@
-!  SVN:$Id$
+!  SVN:$Id: CICE.F90 700 2013-08-15 19:17:39Z eclare $
 !=======================================================================
 ! Copyright 2013, LANSLLC. All rights reserved.
 ! Unless otherwise indicated, this information has been authored by an 

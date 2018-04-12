@@ -1,4 +1,4 @@
-!  SVN:$Id$
+!  SVN:$Id: ice_therm_shared.F90 925 2015-03-04 00:34:27Z eclare $
 !=========================================================================
 !
 ! Shared thermo variables, subroutines

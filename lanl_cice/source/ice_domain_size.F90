@@ -1,4 +1,4 @@
-!  SVN:$Id$
+!  SVN:$Id: ice_domain_size.F90 700 2013-08-15 19:17:39Z eclare $
 !=======================================================================
 
 ! Defines the global domain size and number of categories and layers.

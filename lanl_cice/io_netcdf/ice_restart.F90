@@ -144,6 +144,8 @@
         status        ! status variable from netCDF routine
 
       character (len=3) :: nchar
+      ! for nf90_nofill
+      integer (kind=int_kind) :: oldMode
 
       ! construct path/file
       if (present(filename_spec)) then
@@ -369,6 +371,8 @@
          endif
 
          deallocate(dims)
+         !prevent prefilling of arrays with _FillValue 
+         status = nf90_set_fill(ncid, nf90_nofill, oldMode)
          status = nf90_enddef(ncid)
 
       endif

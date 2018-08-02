@@ -63,7 +63,7 @@
          call init_flux_atm     ! initialize atmosphere fluxes sent to coupler
          call init_flux_ocn     ! initialize ocean fluxes sent to coupler
 
-         write (*, *) 'calling ice_step, ', stepno, time, dt
+         !write (*, *) 'calling ice_step, ', stepno, time, dt
          stepno = stepno + 1
 
          call ice_step

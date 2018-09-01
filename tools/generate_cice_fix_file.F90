@@ -7,7 +7,7 @@ program generate_cice_fix_file
 #define output_grid_qdeg
 ! writes out additional variables not needed by CICE but which can be 
 ! helpful in diagnosing grid generation errors
-!#define debug
+#define debug
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 ! this code generate CICE gird fixed file based on MOM6 ocean_hgrid.nc
 ! information on MOM6 supergrid can be found at
@@ -117,10 +117,11 @@ program generate_cice_fix_file
   real(kind=8), dimension(ni,nj) :: anglet
 #endif
 
-  integer, parameter :: ncice = 5   ! required
+  integer, parameter :: ncice = 5  & ! required
 #ifdef debug
-                                   &
-                              + 7   ! extra
+                              + 7    ! extra
+#else
+                              + 0    ! extra
 #endif
   character(len=256) :: fname_out, fname_in
 

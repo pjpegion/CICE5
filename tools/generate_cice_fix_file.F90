@@ -89,14 +89,19 @@ program generate_cice_fix_file
   character(len=256) :: dirsrc = '/scratch3/NCEPDEV/stmp2/Jiande.Wang/UFS-1x1/master-20180521_1x1/MOM6_FIX_1deg/'
   character(len= 10) :: dirout = './'
   character(len= 10) :: res = 'mx1'
+
+  character(len=100) :: maskfile = 'ocean_mask.nc'
+  character(len= 12) :: maskname = 'mask'
 #endif
 #ifdef output_grid_qdeg
   integer, parameter :: ni = 1440, nj = 1080
   character(len=256) :: dirsrc = '/scratch4/NCEPDEV/nems/noscrub/emc.nemspara/RT/FV3-MOM6-CICE5/master-20180821/MOM6_FIX_025deg/'
   character(len=256) :: dirout = './'
   character(len= 10) :: res = 'mx025'
-#endif
 
+  character(len=100) :: maskfile = 'ocean_topog.nc'
+  character(len= 12) :: maskname = 'wet'
+#endif
   real(kind=8), parameter ::      pi = 4.0*atan(1.0)
   real(kind=8), parameter :: deg2rad = pi/180.0d0
   
@@ -105,32 +110,58 @@ program generate_cice_fix_file
   real(kind=8), dimension(0:nx,0:ny)   :: x, y, angq 
   real(kind=8), dimension(  nx,0:ny)   :: dx
   real(kind=8), dimension(0:nx,  ny)   :: dy
-
   ! required CICE grid variables
+  integer, parameter :: nreqd = 6  ! 5 required, +1 for kmt
+
   real(kind=8), dimension(ni,nj) :: ulon, ulat 
-  real(kind=8), dimension(ni,nj) :: dxt, dyt, htn, hte
+  real(kind=8), dimension(ni,nj) ::  htn, hte
   real(kind=8), dimension(ni,nj) :: angle
 #ifdef debug
+  integer, parameter :: nxtra = 7
+
   real(kind=8), dimension(ni,nj) ::  latT, lonT  ! lat and lon of T on C-grid
   real(kind=8), dimension(ni,nj) :: latCv, lonCv ! lat and lon of V on C-grid
   real(kind=8), dimension(ni,nj) :: latCu, lonCu ! lat and lon of U on C-grid
   real(kind=8), dimension(ni,nj) :: anglet
-#endif
 
-  integer, parameter :: ncice = 5  & ! required
-#ifdef debug
-                              + 7    ! extra
+  integer, parameter :: ncice = nreqd + nxtra
 #else
-                              + 0    ! extra
+  integer, parameter :: ncice = nreqd 
 #endif
+  ! ocean mask from fixed file, stored as either r4 or r8
+     real(kind=4), dimension(ni,nj) :: wet4
+     real(kind=8), dimension(ni,nj) :: wet8
+
   character(len=256) :: fname_out, fname_in
+  character(len=300) :: cmdstr
+  character(len=256) :: history
+  character(len=  8) :: cdate
 
   real(kind=8) :: lon_scale
-  integer :: status,ncid
+  integer :: status,ncid,xtype
   integer :: id, vardim(2)
   integer :: ni_dim,nj_dim
   integer :: i,j,ii,jj,i2,j2
   integer :: ipole(2),i1
+  integer :: system
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! get the mask 
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+  fname_in = trim(dirsrc)//trim(maskfile)
+
+  status = nf90_open(fname_in, nf90_nowrite, ncid)
+  print *, 'reading ocean mask from ',trim(fname_in)
+  print *, 'nf90_open = ',trim(nf90_strerror(status))
+
+  status = nf90_inq_varid(ncid,  trim(maskname), id)
+  status = nf90_inquire_variable(ncid, id, xtype=xtype)
+  if(xtype .eq. 5)status = nf90_get_var(ncid,      id,  wet4)
+  if(xtype .eq. 6)status = nf90_get_var(ncid,      id,  wet8)
+  status = nf90_close(ncid)
+  
+  if(xtype.eq. 6)wet4 = real(wet8,4)
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 ! read supergrid file
@@ -262,6 +293,10 @@ program generate_cice_fix_file
 ! write out cice grid file
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
+  ! create a history attribute
+   call date_and_time(date=cdate)
+   history = 'created on '//trim(cdate)//' from '//trim(fname_in)
+
   call ice_typedefine
 
   fname_out= trim(dirout)//'grid_cice_NEMS_'//trim(res)//'.nc'
@@ -276,10 +311,14 @@ program generate_cice_fix_file
   vardim(2) = nj_dim
   vardim(1) = ni_dim
   do ii = 1,ncice
-   status = nf90_def_var(ncid, trim(icegrid(ii)%var_name), nf90_double, vardim, id)
+   if(trim(icegrid(ii)%var_type) .eq. 'r8')status = nf90_def_var(ncid, &
+                  trim(icegrid(ii)%var_name), nf90_double, vardim, id)
+   if(trim(icegrid(ii)%var_type) .eq. 'i4')status = nf90_def_var(ncid, &
+                  trim(icegrid(ii)%var_name), nf90_int,    vardim, id)
    status = nf90_put_att(ncid, id,     'units', trim(icegrid(ii)%unit_name))
    status = nf90_put_att(ncid, id, 'long_name', trim(icegrid(ii)%long_name))
   enddo
+   status = nf90_put_att(ncid, nf90_global, 'history', trim(history))
    status = nf90_enddef(ncid)
 
   status = nf90_inq_varid(ncid,  'ulon',      id)
@@ -296,6 +335,9 @@ program generate_cice_fix_file
  
   status = nf90_inq_varid(ncid,  'angle',     id)
   status = nf90_put_var(ncid,         id,  angle)
+ 
+  status = nf90_inq_varid(ncid,    'kmt',        id)
+  status = nf90_put_var(ncid,         id, int(wet4))
 #ifdef debug
   status = nf90_inq_varid(ncid, 'anglet',     id)
   status = nf90_put_var(ncid,         id, anglet)
@@ -319,4 +361,14 @@ program generate_cice_fix_file
   status = nf90_put_var(ncid,        id,   latCu)
 #endif
   status = nf90_close(ncid)
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! extract the kmt into a separate file
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+  fname_in =  trim(dirout)//'grid_cice_NEMS_'//trim(res)//'.nc'
+  fname_out = trim(dirout)//'kmtu_cice_NEMS_'//trim(res)//'.nc'
+
+     cmdstr = 'ncks -O -v kmt '//trim(fname_in)//'  '//trim(fname_out)
+     status = system(trim(cmdstr))
 end program generate_cice_fix_file

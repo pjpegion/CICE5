@@ -8,6 +8,7 @@ module icegriddefs
     character(len=12)   ::  var_name
     character(len=64)   :: long_name
     character(len=12)   :: unit_name
+    character(len= 2)   ::  var_type
   end type icedefs
 
   type(icedefs) :: icegrid(maxvars)
@@ -16,6 +17,9 @@ module icegriddefs
   subroutine ice_typedefine
 
   integer :: ii = 0
+  
+   !default
+   icegrid(:)%var_type = 'r8'
 
    ii = ii + 1
    icegrid(ii)%var_name  = 'ulon'
@@ -41,6 +45,12 @@ module icegriddefs
    icegrid(ii)%var_name  = 'angle'
    icegrid(ii)%long_name = 'Angle at corner (Bu) points'
    icegrid(ii)%unit_name = 'radians'
+
+   ii = ii + 1
+   icegrid(ii)%var_name  = 'kmt'
+   icegrid(ii)%long_name = 'ocean fraction at T-cell centers'
+   icegrid(ii)%unit_name = 'none'
+   icegrid(ii)%var_type  = 'i4'
 
    ii = ii + 1
    icegrid(ii)%var_name  = 'anglet'

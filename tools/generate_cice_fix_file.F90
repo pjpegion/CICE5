@@ -131,6 +131,9 @@ program generate_cice_fix_file
   ! ocean mask from fixed file, stored as either r4 or r8
      real(kind=4), dimension(ni,nj) :: wet4
      real(kind=8), dimension(ni,nj) :: wet8
+  ! generic mom grid array for error checking agains ocean_geometry.nc
+     real(kind=8), dimension(ni,nj) :: momvar
+  integer(kind=4), dimension(ni,nj) :: kmt
 
   character(len=256) :: fname_out, fname_in
   character(len=300) :: cmdstr
@@ -371,4 +374,97 @@ program generate_cice_fix_file
 
      cmdstr = 'ncks -O -v kmt '//trim(fname_in)//'  '//trim(fname_out)
      status = system(trim(cmdstr))
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! if a geometry file was written by a MOM6 model run, check values here
+! against those values 
+! could also check diagnostic ocean output if use correct MOM6 names
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+  fname_out = '/scratch3/NCEPDEV/stmp1/Denise.Worthen/frzmlt_cold_geomfile/tmp/' &
+            //'cpld_fv3_mom6_cice_cold_atm_flux/MOM6_OUTPUT/ocean_geometry.nc'
+
+  status = nf90_open(fname_out, nf90_nowrite, ncid)
+  print *, 'reading MOM6 runtime geometry from ',trim(fname_out)
+  print *, 'nf90_open = ',trim(nf90_strerror(status))
+  if(status .ne. 0)stop
+  
+  ! use kmt as a 'check mask' to eliminate known non-matching values
+  ! to not report
+
+  kmt = int(wet4)
+  !geolatb; corners 
+  status = nf90_inq_varid(ncid, 'geolatb',      id)  
+  status = nf90_get_var(ncid,          id,  momvar)
+  momvar = momvar*deg2rad
+  call checkvals('ulat',ni,nj,ulat,momvar,wet4,kmt)
+   
+  kmt = int(wet4)
+  ! fix no match at j=nj,i=i>nj
+  !kmt(nj:ni,nj) = 0
+  !geolonb; corners 
+  status = nf90_inq_varid(ncid, 'geolonb',      id)  
+  status = nf90_get_var(ncid,          id,  momvar)
+  momvar = momvar*deg2rad
+  call checkvals('ulon',ni,nj,ulon,momvar,wet4,kmt)
+
+  !htn
+  kmt = int(wet4)
+  status = nf90_inq_varid(ncid,    'dxCv',      id)  
+  status = nf90_get_var(ncid,          id,  momvar)
+  momvar = momvar*100.0
+  call checkvals('htn',ni,nj,htn,momvar,wet4,kmt)
+
+  !hte
+  kmt = int(wet4)
+  ! fix  no match at i=ni/2; i=ni
+  !kmt(ni/2,:) = 0
+  !kmt(ni,  :) = 0
+  status = nf90_inq_varid(ncid,    'dyCu',      id)
+  status = nf90_get_var(ncid,          id,  momvar)
+  momvar = momvar*100.0
+  call checkvals('hte',ni,nj,hte,momvar,wet4,kmt)
+#ifdef debug
+  !geolat; centers, in degrees  
+  kmt = int(wet4)
+  status = nf90_inq_varid(ncid,  'geolat',      id)
+  status = nf90_get_var(ncid,          id,  momvar)
+  call checkvals('latT',ni,nj,latT,momvar,wet4,kmt)
+
+  !geolon; centers, in degrees 
+  kmt = int(wet4)
+  status = nf90_inq_varid(ncid,  'geolon',      id)
+  status = nf90_get_var(ncid,          id,  momvar)
+  call checkvals('lonT',ni,nj,lonT,momvar,wet4,kmt)
+#endif
+  status = nf90_close(ncid)
+
 end program generate_cice_fix_file
+
+subroutine checkvals(vname,idim,jdim,cice,mom,wet,chkmask)
+
+  implicit none
+
+                       character(len=*), intent(in) :: vname
+                                integer, intent(in) :: idim,jdim
+     real(kind=8), intent(in), dimension(idim,jdim) :: cice,mom
+     real(kind=4), intent(in), dimension(idim,jdim) :: wet
+  integer(kind=4), intent(in), dimension(idim,jdim) :: chkmask
+
+  real(kind=8), dimension(idim,jdim) :: diff
+  real(kind=8) :: maxdiff
+
+  integer :: i,j,ijloc(2)
+  
+     diff = abs(cice-mom)
+  maxdiff = maxval(diff, mask = chkmask*int(wet) .eq. 1)
+    ijloc = maxloc(diff)
+ 
+  print '(3a,e15.8,a,2i6)','Max difference for CICE variable ',trim(vname),' : ',maxdiff,' at i,j =',ijloc
+  if(maxdiff .ne. 0.0)then
+   print '(2(a,f10.4),a,f5.1)','CICE at ijloc ',cice(ijloc(1),ijloc(2)),&
+                               ' MOM at ijloc ',mom(ijloc(1),ijloc(2)), &
+                               ' land mask at ijloc ',wet(ijloc(1),ijloc(2))
+  endif
+  print * 
+end subroutine checkvals

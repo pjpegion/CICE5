@@ -24,4 +24,4 @@ $(EXE): $(OBJ)
 	$(FC) $(FC_FLAGS) $<
 
 clean: 
-	rm -f $(OBJ) $(EXE)
+	rm -f $(OBJ) $(EXE) *.mod

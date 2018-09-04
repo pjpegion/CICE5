@@ -7,7 +7,7 @@ program generate_cice_fix_file
 #define output_grid_qdeg
 ! writes out additional variables not needed by CICE but which can be 
 ! helpful in diagnosing grid generation errors
-#define debug
+!#define debug
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 ! this code generate CICE gird fixed file based on MOM6 ocean_hgrid.nc
 ! information on MOM6 supergrid can be found at
@@ -392,17 +392,17 @@ program generate_cice_fix_file
   ! use kmt as a 'check mask' to eliminate known non-matching values
   ! to not report
 
-  kmt = int(wet4)
   !geolatb; corners 
+  kmt = int(wet4)
   status = nf90_inq_varid(ncid, 'geolatb',      id)  
   status = nf90_get_var(ncid,          id,  momvar)
   momvar = momvar*deg2rad
   call checkvals('ulat',ni,nj,ulat,momvar,wet4,kmt)
    
+  !geolonb; corners 
   kmt = int(wet4)
   ! fix no match at j=nj,i=i>nj
-  !kmt(nj:ni,nj) = 0
-  !geolonb; corners 
+  kmt(nj:ni,nj) = 0
   status = nf90_inq_varid(ncid, 'geolonb',      id)  
   status = nf90_get_var(ncid,          id,  momvar)
   momvar = momvar*deg2rad

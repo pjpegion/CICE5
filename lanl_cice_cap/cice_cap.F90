@@ -6,7 +6,11 @@
 ! 5/10/13
 ! This is now acting as a cap/connector between NUOPC driver and LANL CICE code.
 !
-
+! 8/27/18: Denise Worthen (denise.worthen@noaa.gov)
+!  * `GridAttachArea` - when set to "true", this option indicates that CICE grid attaches cell area
+!   using internal values computed in CICE. The default value is "false", so grid cell area will
+!   be computed in ESMF.
+ 
 module cice_cap_mod
 
   use ice_blocks, only: nx_block, ny_block, nblocks_tot, block, get_block, &
@@ -67,8 +71,9 @@ module cice_cap_mod
   integer :: dbrc     ! temporary debug rc value
 
   type(ESMF_Grid), save :: ice_grid_i
-  logical :: write_diagnostics = .true.
-  logical :: profile_memory = .true.
+  logical :: write_diagnostics = .false.
+  logical :: profile_memory = .false.
+  logical :: grid_attach_area = .false.
 
   contains
   !-----------------------------------------------------------------------
@@ -151,6 +156,7 @@ module cice_cap_mod
     type(ESMF_VM)         :: vm
     integer               :: lpet
 
+    character(240)        :: msgString
     rc = ESMF_SUCCESS
 
     ! Switch to IPDv01 by filtering all other phaseMap entries
@@ -172,6 +178,8 @@ module cice_cap_mod
       line=__LINE__, &
       file=__FILE__)) &
       return  ! bail out
+     write(msgString,'(a12,i8)')'CICE lpet = ',lpet
+     call ESMF_LogWrite(trim(msgString), ESMF_LOGMSG_INFO)
 
     call ESMF_AttributeGet(gcomp, name="DumpFields", value=value, defaultValue="true", &
       convention="NUOPC", purpose="Instance", rc=rc)
@@ -180,6 +188,8 @@ module cice_cap_mod
       file=__FILE__)) &
       return  ! bail out
     write_diagnostics=(trim(value)=="true")
+    write(msgString,'(A,l6)')'CICE_CAP: Dumpfields = ',write_diagnostics
+    call ESMF_LogWrite(trim(msgString), ESMF_LOGMSG_INFO, rc=rc)
 
     call ESMF_AttributeGet(gcomp, name="ProfileMemory", value=value, defaultValue="true", &
       convention="NUOPC", purpose="Instance", rc=rc)
@@ -188,10 +198,22 @@ module cice_cap_mod
       file=__FILE__)) &
       return  ! bail out
     profile_memory=(trim(value)/="false")
+    write(msgString,'(A,l6)')'CICE_CAP: Profile_memory = ',profile_memory
+    call ESMF_LogWrite(trim(msgString), ESMF_LOGMSG_INFO, rc=rc)
 
-    if(lpet == 0) &
-      print *, 'CICE DumpFields = ', write_diagnostics, 'ProfileMemory = ', profile_memory
-    
+    call ESMF_AttributeGet(gcomp, name="GridAttachArea", value=value, defaultValue="false", &
+      convention="NUOPC", purpose="Instance", rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+    grid_attach_area=(trim(value)=="true")
+    write(msgString,'(A,l6)')'CICE_CAP: GridAttachArea = ',grid_attach_area
+    call ESMF_LogWrite(trim(msgString), ESMF_LOGMSG_INFO, rc=rc)
+
+    !if(lpet == 0) &
+    !  print *, 'CICE DumpFields = ', write_diagnostics, 'ProfileMemory = ', profile_memory
+
   end subroutine
   
   !-----------------------------------------------------------------------------
@@ -314,6 +336,9 @@ module cice_cap_mod
        call ESMF_LogWrite(trim(tmpstr), ESMF_LOGMSG_INFO, rc=dbrc)
        write(tmpstr,'(a,3i8)') subname//' jglo = ',n,deBlockList(2,1,n),deBlockList(2,2,n)
        call ESMF_LogWrite(trim(tmpstr), ESMF_LOGMSG_INFO, rc=dbrc)
+
+       write(tmpstr,'(a,3i8)') subname//' petMap = ',n,petMap(n),nblocks_tot
+       call ESMF_LogWrite(trim(tmpstr), ESMF_LOGMSG_INFO, rc=dbrc)
     enddo
 
     delayout = ESMF_DELayoutCreate(petMap, rc=rc)
@@ -390,10 +415,16 @@ module cice_cap_mod
     call ESMF_GridAddItem(gridIn, itemFlag=ESMF_GRIDITEM_MASK, itemTypeKind=ESMF_TYPEKIND_I4, &
        staggerLoc=ESMF_STAGGERLOC_CENTER, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
-!commented out to remove Area from Grid
-!   call ESMF_GridAddItem(gridIn, itemFlag=ESMF_GRIDITEM_AREA, itemTypeKind=ESMF_TYPEKIND_R8, &
-!      staggerLoc=ESMF_STAGGERLOC_CENTER, rc=rc)
-!   if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+
+    ! Attach area to the Grid optionally. By default the cell areas are computed.
+    if(grid_attach_area) then
+      call ESMF_GridAddItem(gridIn, itemFlag=ESMF_GRIDITEM_AREA, itemTypeKind=ESMF_TYPEKIND_R8, &
+         staggerLoc=ESMF_STAGGERLOC_CENTER, rc=rc)
+      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+        line=__LINE__, &
+        file=__FILE__)) &
+        return  ! bail out
+    endif
 
     do iblk = 1,nblocks
        DE = iblk-1
@@ -426,11 +457,22 @@ module cice_cap_mod
            staggerloc=ESMF_STAGGERLOC_CENTER, &
            farrayPtr=gridmask, rc=rc)
        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
-!commented out to remove Area from Grid
-!      call ESMF_GridGetItem(gridIn, itemflag=ESMF_GRIDITEM_AREA, localDE=DE, &
-!          staggerloc=ESMF_STAGGERLOC_CENTER, &
-!          farrayPtr=gridarea, rc=rc)
-!      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+
+      if(grid_attach_area) then
+       call ESMF_GridGetItem(gridIn, itemflag=ESMF_GRIDITEM_AREA, localDE=DE, &
+            staggerloc=ESMF_STAGGERLOC_CENTER, &
+            farrayPtr=gridarea, rc=rc)
+       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+       do j1 = lbnd(2),ubnd(2)
+       do i1 = lbnd(1),ubnd(1)
+          i = i1 + ilo - lbnd(1)
+          j = j1 + jlo - lbnd(2)
+          gridarea(i1,j1) = tarea(i,j,iblk)
+       enddo
+       enddo
+       write(tmpstr,'(a,5i8)') subname//' setting ESMF_GRIDITEM_AREA using tarea '
+       call ESMF_LogWrite(trim(tmpstr), ESMF_LOGMSG_INFO, line=__LINE__, file=__FILE__, rc=dbrc)
+      endif
 
        do j1 = lbnd(2),ubnd(2)
        do i1 = lbnd(1),ubnd(1)
@@ -439,7 +481,6 @@ module cice_cap_mod
           coordXcenter(i1,j1) = TLON(i,j,iblk) * rad_to_deg
           coordYcenter(i1,j1) = TLAT(i,j,iblk) * rad_to_deg
           gridmask(i1,j1) = nint(hm(i,j,iblk))
-!         gridarea(i1,j1) = tarea(i,j,iblk)
        enddo
        enddo
 
@@ -813,7 +854,7 @@ module cice_cap_mod
       endif
     enddo
 #endif
-  endif  ! write_diagnostics
+  endif  ! write_diagnostics 
 
     call State_getFldPtr(importState,'inst_temp_height_lowest',dataPtr_Tbot,rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU,line=__LINE__,file=__FILE__)) return
@@ -1019,11 +1060,11 @@ module cice_cap_mod
     call State_getFldPtr(exportState,'mean_evap_rate_atm_into_ice',dataPtr_evap,rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU,line=__LINE__,file=__FILE__)) return
 
-    write(info, *) subname//' ifrac size :', &
-      lbound(dataPtr_ifrac,1), ubound(dataPtr_ifrac,1), &
-      lbound(dataPtr_ifrac,2), ubound(dataPtr_ifrac,2), &
-      lbound(dataPtr_ifrac,3), ubound(dataPtr_ifrac,3)
-    call ESMF_LogWrite(info, ESMF_LOGMSG_INFO, rc=dbrc)
+    !write(info, *) subname//' ifrac size :', &
+    !  lbound(dataPtr_ifrac,1), ubound(dataPtr_ifrac,1), &
+    !  lbound(dataPtr_ifrac,2), ubound(dataPtr_ifrac,2), &
+    !  lbound(dataPtr_ifrac,3), ubound(dataPtr_ifrac,3)
+    !call ESMF_LogWrite(info, ESMF_LOGMSG_INFO, rc=dbrc)
 
     dataPtr_ifrac = 0._ESMF_KIND_R8
     dataPtr_itemp = 0._ESMF_KIND_R8
@@ -1084,14 +1125,14 @@ module cice_cap_mod
        enddo
     enddo
 
-    write(tmpstr,*) subname//' mask = ',minval(dataPtr_mask),maxval(dataPtr_mask)
-    call ESMF_LogWrite(trim(tmpstr), ESMF_LOGMSG_INFO, rc=dbrc)
+    !write(tmpstr,*) subname//' mask = ',minval(dataPtr_mask),maxval(dataPtr_mask)
+    !call ESMF_LogWrite(trim(tmpstr), ESMF_LOGMSG_INFO, rc=dbrc)
 
     !-------------------------------------------------
 
+  if(write_diagnostics) then
     call state_diagnose(exportState, 'cice_export', rc)
 
-  if(write_diagnostics) then
     export_slice = export_slice + 1
 
 #if (1 == 0)
@@ -1155,8 +1196,7 @@ module cice_cap_mod
       endif
     enddo
 #endif
-  endif  ! write_diagnostics
-
+  endif  ! write_diagnostics 
     write(info,*) subname,' --- run phase 4 called --- ',rc
     call ESMF_LogWrite(info, ESMF_LOGMSG_INFO, rc=dbrc)
 

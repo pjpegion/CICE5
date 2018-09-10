@@ -7,7 +7,7 @@ program generate_cice_fix_file
 #define output_grid_qdeg
 ! writes out additional variables not needed by CICE but which can be 
 ! helpful in diagnosing grid generation errors
-!#define debug
+#define debug
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 ! this code generate CICE gird fixed file based on MOM6 ocean_hgrid.nc
 ! information on MOM6 supergrid can be found at
@@ -380,14 +380,14 @@ program generate_cice_fix_file
 ! against those values 
 ! could also check diagnostic ocean output if use correct MOM6 names
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
+  
   fname_out = '/scratch3/NCEPDEV/stmp1/Denise.Worthen/frzmlt_cold_geomfile/tmp/' &
             //'cpld_fv3_mom6_cice_cold_atm_flux/MOM6_OUTPUT/ocean_geometry.nc'
 
   status = nf90_open(fname_out, nf90_nowrite, ncid)
+  if(status .ne. 0)stop
   print *, 'reading MOM6 runtime geometry from ',trim(fname_out)
   print *, 'nf90_open = ',trim(nf90_strerror(status))
-  if(status .ne. 0)stop
   
   ! use kmt as a 'check mask' to eliminate known non-matching values
   ! to not report

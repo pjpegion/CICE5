@@ -13,8 +13,10 @@ begin
   ; rad 2 degree
   rad2deg = 180.0d0/acos(-1.0d0)
  
-  grres = "mx1"
-  ;grres = "mx025"
+  ;grres = "mx1"
+  ;minlat = 86
+  grres = "mx025"
+  minlat = 88
 
   ;angle2plot = "angle"
   ; only after debug mode
@@ -65,7 +67,7 @@ begin
   ;wkstype="png"
   wkstype@wkWidth=800
   wkstype@wkHeight=800
-  wks   = gsn_open_wks (wkstype,"polar")              ; send graphics to X11 window
+  wks   = gsn_open_wks (wkstype,angle2plot+"_"+grres+"_"+minlat+"N")              ; send graphics to X11 window
 
   npanels = 1
      plot = new(npanels,graphic)
@@ -86,7 +88,7 @@ begin
 
   res@gsnPolar     = "NH"                   ; specify the hemisphere
   ;res@mpMinLatF    =  66                    ; minimum lat to plot
-  res@mpMinLatF    =  88                    ; minimum lat to plot
+  res@mpMinLatF    =  minlat                 ; minimum lat to plot
   res@mpCenterLonF = -45
 
   ;res@cnFillPalette   =  "BlueWhiteOrangeRed"                      ; choose colormap
@@ -115,7 +117,7 @@ begin
 
   if(angle2plot .eq.  "angle")then
           ii = 0
-          ang = filesrc->$angname$(:,:)
+         ang = filesrc->$angname$(:,:)
    ang@lon2d = filesrc->$anglonname$*rad2deg
    ang@lat2d = filesrc->$anglatname$*rad2deg
   ang@units     = " "

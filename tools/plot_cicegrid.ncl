@@ -67,7 +67,7 @@ begin
   ;wkstype="png"
   wkstype@wkWidth=800
   wkstype@wkHeight=800
-  wks   = gsn_open_wks (wkstype,"grid")              ; send graphics to X11 window
+  wks   = gsn_open_wks (wkstype,varname+"_"+grres)              ; send graphics to X11 window
 
   npanels = 1
      plot = new(npanels,graphic)

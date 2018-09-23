@@ -257,7 +257,7 @@ module cice_cap_mod
       file=__FILE__)) &
       return  ! bail out
 
-    write(info,*) subname,' --- initialization phase 1 completed --- '
+    write(info,*) trim(subname),' --- initialization phase 1 completed --- '
     call ESMF_LogWrite(info, ESMF_LOGMSG_INFO, rc=dbrc)
 
   end subroutine
@@ -308,7 +308,7 @@ module cice_cap_mod
     ! file. We also use the exact decomposition in CICE so that the Fields
     ! created can wrap on the data pointers in internal part of CICE
 
-    write(tmpstr,'(a,2i8)') subname//' ice nx,ny = ',nx_global,ny_global
+    write(tmpstr,'(a,2i8)') trim(subname)//' ice nx,ny = ',nx_global,ny_global
     call ESMF_LogWrite(trim(tmpstr), ESMF_LOGMSG_INFO, rc=dbrc)
 
 !    distgrid = ESMF_DistGridCreate(minIndex=(/1,1/), maxIndex=(/nx_global,ny_global/), &
@@ -318,7 +318,7 @@ module cice_cap_mod
     allocate(petMap(nblocks_tot))
     allocate(deLabelList(nblocks_tot))
 
-    write(tmpstr,'(a,1i8)') subname//' nblocks = ',nblocks_tot
+    write(tmpstr,'(a,1i8)') trim(subname)//' nblocks = ',nblocks_tot
     call ESMF_LogWrite(trim(tmpstr), ESMF_LOGMSG_INFO, rc=dbrc)
     do n = 1, nblocks_tot
        deLabelList(n) = n
@@ -330,14 +330,14 @@ module cice_cap_mod
        deBlockList(2,2,n) = j_glob(jhi)
        call ice_distributionGetBlockLoc(distrb_info,n,peID,locID)
        petMap(n) = peID - 1
-       write(tmpstr,'(a,2i8)') subname//' IDs  = ',n,peID
+       write(tmpstr,'(a,2i8)') trim(subname)//' IDs  = ',n,peID
        call ESMF_LogWrite(trim(tmpstr), ESMF_LOGMSG_INFO, rc=dbrc)
-       write(tmpstr,'(a,3i8)') subname//' iglo = ',n,deBlockList(1,1,n),deBlockList(1,2,n)
+       write(tmpstr,'(a,3i8)') trim(subname)//' iglo = ',n,deBlockList(1,1,n),deBlockList(1,2,n)
        call ESMF_LogWrite(trim(tmpstr), ESMF_LOGMSG_INFO, rc=dbrc)
-       write(tmpstr,'(a,3i8)') subname//' jglo = ',n,deBlockList(2,1,n),deBlockList(2,2,n)
+       write(tmpstr,'(a,3i8)') trim(subname)//' jglo = ',n,deBlockList(2,1,n),deBlockList(2,2,n)
        call ESMF_LogWrite(trim(tmpstr), ESMF_LOGMSG_INFO, rc=dbrc)
 
-       write(tmpstr,'(a,3i8)') subname//' petMap = ',n,petMap(n),nblocks_tot
+       write(tmpstr,'(a,3i8)') trim(subname)//' petMap = ',n,petMap(n),nblocks_tot
        call ESMF_LogWrite(trim(tmpstr), ESMF_LOGMSG_INFO, rc=dbrc)
     enddo
 
@@ -384,11 +384,11 @@ module cice_cap_mod
     call ESMF_DistGridGet(distgrid=distgrid, localDE=0, elementCount=cnt, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
     allocate(indexList(cnt))
-    write(tmpstr,'(a,i8)') subname//' distgrid cnt= ',cnt
+    write(tmpstr,'(a,i8)') trim(subname)//' distgrid cnt= ',cnt
     call ESMF_LogWrite(trim(tmpstr), ESMF_LOGMSG_INFO, rc=dbrc)
     call ESMF_DistGridGet(distgrid=distgrid, localDE=0, seqIndexList=indexList, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
-    write(tmpstr,'(a,4i8)') subname//' distgrid list= ',indexList(1),indexList(cnt),minval(indexList), maxval(indexList)
+    write(tmpstr,'(a,4i8)') trim(subname)//' distgrid list= ',indexList(1),indexList(cnt),minval(indexList), maxval(indexList)
     call ESMF_LogWrite(trim(tmpstr), ESMF_LOGMSG_INFO, rc=dbrc)
     deallocate(IndexList)
 
@@ -444,10 +444,10 @@ module cice_cap_mod
            farrayPtr=coordYcenter, rc=rc)
        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
 
-       write(tmpstr,'(a,5i8)') subname//' iblk center bnds ',iblk,lbnd,ubnd
+       write(tmpstr,'(a,5i8)') trim(subname)//' iblk center bnds ',iblk,lbnd,ubnd
        call ESMF_LogWrite(trim(tmpstr), ESMF_LOGMSG_INFO, rc=dbrc)
        if (lbnd(1) /= 1 .or. lbnd(2) /= 1 .or. ubnd(1) /= ihi-ilo+1 .or. ubnd(2) /= jhi-jlo+1) then
-          write(tmpstr,'(a,5i8)') subname//' iblk bnds ERROR '
+          write(tmpstr,'(a,5i8)') trim(subname)//' iblk bnds ERROR '
           call ESMF_LogWrite(trim(tmpstr), ESMF_LOGMSG_INFO, line=__LINE__, file=__FILE__, rc=dbrc)
           rc = ESMF_FAILURE
           return
@@ -470,7 +470,7 @@ module cice_cap_mod
           gridarea(i1,j1) = tarea(i,j,iblk)
        enddo
        enddo
-       write(tmpstr,'(a,5i8)') subname//' setting ESMF_GRIDITEM_AREA using tarea '
+       write(tmpstr,'(a,5i8)') trim(subname)//' setting ESMF_GRIDITEM_AREA using tarea '
        call ESMF_LogWrite(trim(tmpstr), ESMF_LOGMSG_INFO, line=__LINE__, file=__FILE__, rc=dbrc)
       endif
 
@@ -494,7 +494,7 @@ module cice_cap_mod
            farrayPtr=coordYcorner, rc=rc)
        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
 
-       write(tmpstr,'(a,5i8)') subname//' iblk corner bnds ',iblk,lbnd,ubnd
+       write(tmpstr,'(a,5i8)') trim(subname)//' iblk corner bnds ',iblk,lbnd,ubnd
        call ESMF_LogWrite(trim(tmpstr), ESMF_LOGMSG_INFO, rc=dbrc)
 
        ! ULON and ULAT are upper right hand corner from TLON and TLAT
@@ -517,7 +517,7 @@ module cice_cap_mod
       line=__LINE__, &
       file=__FILE__)) &
       return  ! bail out
-    write(tmpstr,'(a,2g15.7)') subname//' gridIn center1 = ',minval(tarray),maxval(tarray)
+    write(tmpstr,'(a,2g15.7)') trim(subname)//' gridIn center1 = ',minval(tarray),maxval(tarray)
     call ESMF_LogWrite(trim(tmpstr), ESMF_LOGMSG_INFO, rc=dbrc)
 
     call ESMF_GridGetCoord(gridIn, coordDim=2, localDE=0,  &
@@ -526,7 +526,7 @@ module cice_cap_mod
       line=__LINE__, &
       file=__FILE__)) &
       return  ! bail out
-    write(tmpstr,'(a,2g15.7)') subname//' gridIn center2 = ',minval(tarray),maxval(tarray)
+    write(tmpstr,'(a,2g15.7)') trim(subname)//' gridIn center2 = ',minval(tarray),maxval(tarray)
     call ESMF_LogWrite(trim(tmpstr), ESMF_LOGMSG_INFO, rc=dbrc)
 
     call ESMF_GridGetCoord(gridIn, coordDim=1, localDE=0,  &
@@ -535,7 +535,7 @@ module cice_cap_mod
       line=__LINE__, &
       file=__FILE__)) &
       return  ! bail out
-    write(tmpstr,'(a,2g15.7)') subname//' gridIn corner1 = ',minval(tarray),maxval(tarray)
+    write(tmpstr,'(a,2g15.7)') trim(subname)//' gridIn corner1 = ',minval(tarray),maxval(tarray)
     call ESMF_LogWrite(trim(tmpstr), ESMF_LOGMSG_INFO, rc=dbrc)
 
     call ESMF_GridGetCoord(gridIn, coordDim=2, localDE=0,  &
@@ -544,7 +544,7 @@ module cice_cap_mod
       line=__LINE__, &
       file=__FILE__)) &
       return  ! bail out
-    write(tmpstr,'(a,2g15.7)') subname//' gridIn corner2 = ',minval(tarray),maxval(tarray)
+    write(tmpstr,'(a,2g15.7)') trim(subname)//' gridIn corner2 = ',minval(tarray),maxval(tarray)
     call ESMF_LogWrite(trim(tmpstr), ESMF_LOGMSG_INFO, rc=dbrc)
 
     gridOut = gridIn ! for now out same as in
@@ -580,7 +580,7 @@ module cice_cap_mod
 !    dataPtr_ifrac = -99._ESMF_KIND_R8
 !    dataPtr_itemp = -99._ESMF_KIND_R8
 
-    write(info,*) subname,' --- initialization phase 2 completed --- '
+    write(info,*) trim(subname),' --- initialization phase 2 completed --- '
     call ESMF_LogWrite(info, ESMF_LOGMSG_INFO, line=__LINE__, file=__FILE__, rc=dbrc)
 
   end subroutine
@@ -717,7 +717,7 @@ module cice_cap_mod
 
     rc = ESMF_SUCCESS
     if(profile_memory) call ESMF_VMLogMemInfo("Entering CICE Model_ADVANCE: ")
-    write(info,*) subname,' --- run phase 1 called --- '
+    write(info,*) trim(subname),' --- run phase 1 called --- '
     call ESMF_LogWrite(info, ESMF_LOGMSG_INFO, rc=dbrc)
 
     
@@ -995,12 +995,12 @@ module cice_cap_mod
        call t2ugrid_vector(ss_tlty)
     enddo
 
-    write(info,*) subname,' --- run phase 2 called --- '
+    write(info,*) trim(subname),' --- run phase 2 called --- '
     call ESMF_LogWrite(info, ESMF_LOGMSG_INFO, rc=dbrc)
     if(profile_memory) call ESMF_VMLogMemInfo("Before CICE_Run")
     call CICE_Run
     if(profile_memory) call ESMF_VMLogMemInfo("Afterr CICE_Run")
-    write(info,*) subname,' --- run phase 3 called --- '
+    write(info,*) trim(subname),' --- run phase 3 called --- '
     call ESMF_LogWrite(info, ESMF_LOGMSG_INFO, rc=dbrc)
 
     !---- local modifications to coupling fields -----
@@ -1060,7 +1060,7 @@ module cice_cap_mod
     call State_getFldPtr(exportState,'mean_evap_rate_atm_into_ice',dataPtr_evap,rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU,line=__LINE__,file=__FILE__)) return
 
-    !write(info, *) subname//' ifrac size :', &
+    !write(info, *) trim(subname)//' ifrac size :', &
     !  lbound(dataPtr_ifrac,1), ubound(dataPtr_ifrac,1), &
     !  lbound(dataPtr_ifrac,2), ubound(dataPtr_ifrac,2), &
     !  lbound(dataPtr_ifrac,3), ubound(dataPtr_ifrac,3)
@@ -1119,13 +1119,13 @@ module cice_cap_mod
           dataPtr_strocnyT(i1,j1,iblk) = ui*sin(ANGLET(i,j,iblk)) + vj*cos(ANGLET(i,j,iblk))  ! ice ocean stress
 !          dataPtr_strocni(i1,j1,iblk) = ui
 !          dataPtr_strocnj(i1,j1,iblk) = vj
-!!          write(tmpstr,'(a,3i6,2x,g17.7)') subname//' aice = ',i,j,iblk,dataPtr_ifrac(i,j,iblk)
+!!          write(tmpstr,'(a,3i6,2x,g17.7)') trim(subname)//' aice = ',i,j,iblk,dataPtr_ifrac(i,j,iblk)
 !!          call ESMF_LogWrite(trim(tmpstr), ESMF_LOGMSG_INFO, rc=dbrc)
        enddo
        enddo
     enddo
 
-    !write(tmpstr,*) subname//' mask = ',minval(dataPtr_mask),maxval(dataPtr_mask)
+    !write(tmpstr,*) trim(subname)//' mask = ',minval(dataPtr_mask),maxval(dataPtr_mask)
     !call ESMF_LogWrite(trim(tmpstr), ESMF_LOGMSG_INFO, rc=dbrc)
 
     !-------------------------------------------------
@@ -1197,7 +1197,7 @@ module cice_cap_mod
     enddo
 #endif
   endif  ! write_diagnostics 
-    write(info,*) subname,' --- run phase 4 called --- ',rc
+    write(info,*) trim(subname),' --- run phase 4 called --- ',rc
     call ESMF_LogWrite(info, ESMF_LOGMSG_INFO, rc=dbrc)
 
 ! Dump out all the cice internal fields to cross-examine with those connected with mediator
@@ -1296,7 +1296,7 @@ module cice_cap_mod
 
     rc = ESMF_SUCCESS
 
-    write(info,*) subname,' --- finalize called --- '
+    write(info,*) trim(subname),' --- finalize called --- '
     call ESMF_LogWrite(info, ESMF_LOGMSG_INFO, rc=dbrc)
 
     call NUOPC_ModelGet(gcomp, modelClock=clock, rc=rc)
@@ -1313,7 +1313,7 @@ module cice_cap_mod
 
     call CICE_Finalize
 
-    write(info,*) subname,' --- finalize completed --- '
+    write(info,*) trim(subname),' --- finalize completed --- '
     call ESMF_LogWrite(info, ESMF_LOGMSG_INFO, rc=dbrc)
 
   end subroutine cice_model_finalize
@@ -1380,7 +1380,7 @@ module cice_cap_mod
       !if (rc /= ESMF_SUCCESS) call ESMF_Finalize()
 
       !write(info, *) pet, 'exc', elb, eub, 'comp', clb, cub, 'total', tlb, tub
-      !call ESMF_LogWrite(subname // tag // " Grid "// info, &
+      !call ESMF_LogWrite(trim(subname) // tag // " Grid "// info, &
       !  ESMF_LOGMSG_INFO, &
       !  line=__LINE__, &
       !  file=__FILE__, &
@@ -1389,7 +1389,7 @@ module cice_cap_mod
     do i = 1, nfields
 
       if (field_defs(i)%assoc) then
-        write(info, *) subname, tag, ' Field ', field_defs(i)%shortname, ':', &
+        write(info, *) trim(subname), tag, ' Field ', trim(field_defs(i)%shortname), ':', &
           lbound(field_defs(i)%farrayPtr,1), ubound(field_defs(i)%farrayPtr,1), &
           lbound(field_defs(i)%farrayPtr,2), ubound(field_defs(i)%farrayPtr,2), &
           lbound(field_defs(i)%farrayPtr,3), ubound(field_defs(i)%farrayPtr,3)
@@ -1421,7 +1421,7 @@ module cice_cap_mod
           line=__LINE__, &
           file=__FILE__)) &
           return  ! bail out
-        call ESMF_LogWrite(subname // tag // " Field "// field_defs(i)%stdname // " is connected.", &
+        call ESMF_LogWrite(trim(subname) // tag // " Field "// trim(field_defs(i)%stdname) // " is connected.", &
           ESMF_LOGMSG_INFO, &
           line=__LINE__, &
           file=__FILE__, &
@@ -1432,7 +1432,7 @@ module cice_cap_mod
 !          file=__FILE__)) &
 !          return  ! bail out
       else
-        call ESMF_LogWrite(subname // tag // " Field "// field_defs(i)%stdname // " is not connected.", &
+        call ESMF_LogWrite(trim(subname) // tag // " Field "// trim(field_defs(i)%stdname) // " is not connected.", &
           ESMF_LOGMSG_INFO, &
           line=__LINE__, &
           file=__FILE__, &
@@ -1484,7 +1484,7 @@ module cice_cap_mod
     do n = 1, fieldCount
       call State_GetFldPtr(State, fieldNameList(n), dataPtr, rc=lrc)
       if (ESMF_LogFoundError(rcToCheck=lrc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
-      write(tmpstr,'(A,3g14.7)') trim(subname)//' '//trim(lstring)//':'//trim(fieldNameList(n)), &
+      write(tmpstr,'(A,3g14.7)') trim(subname)//' '//trim(lstring)//':'//trim(fieldNameList(n))//'  ', &
         minval(dataPtr),maxval(dataPtr),sum(dataPtr)
 !      write(tmpstr,'(A)') trim(subname)//' '//trim(lstring)//':'//trim(fieldNameList(n))
       call ESMF_LogWrite(trim(tmpstr), ESMF_LOGMSG_INFO, rc=dbrc)

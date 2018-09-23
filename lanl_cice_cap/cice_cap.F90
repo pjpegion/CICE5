@@ -923,13 +923,7 @@ module cice_cap_mod
       lbound(dataPtr_ocncm,3), ubound(dataPtr_ocncm,3)
     call ESMF_LogWrite(info, ESMF_LOGMSG_INFO, rc=dbrc)
 
-    write(info, *) trim(subname)//' ANGLET size :', &
-      lbound(ANGLET,1), ubound(ANGLET,1), &
-      lbound(ANGLET,2), ubound(ANGLET,2), &
-      lbound(ANGLET,3), ubound(ANGLET,3)
-    call ESMF_LogWrite(info, ESMF_LOGMSG_INFO, rc=dbrc)
-
-    write(tmpstr,*) trim(subname)//' ANGLET = ',minval(ANGLET),maxval(ANGLET)
+    write(tmpstr,*) trim(subname)//' dataPtr_sl = ',minval(dataPtr_sl),maxval(dataPtr_sl)
     call ESMF_LogWrite(trim(tmpstr), ESMF_LOGMSG_INFO, rc=dbrc)
 
     ! fill the native CICE variables
@@ -999,10 +993,20 @@ module cice_cap_mod
        enddo
        enddo
     enddo
+    write(info, *) trim(subname)//' before halo update ssh i=1,2,3:', &
+     real(ssh(1,(jhi-jlo)+1,1),4),&
+     real(ssh(2,(jhi-jlo)+1,1),4),&
+     real(ssh(3,(jhi-jlo)+1,1),4)
+    call ESMF_LogWrite(info, ESMF_LOGMSG_INFO, rc=dbrc)
+
+    write(info, *) trim(subname)//' before halo update ssh j=jhi-1,jhi,jhi+1:', &
+     real(ssh((ihi-ilo)+1,jhi-1,1),4),&
+     real(ssh((ihi-ilo)+1,jhi,  1),4),&
+     real(ssh((ihi-ilo)+1,jhi+1,1),4)
+    call ESMF_LogWrite(info, ESMF_LOGMSG_INFO, rc=dbrc)
 
     write(tmpstr,*) trim(subname)//' fldsToIce_num = ',fldsToIce_num
     call ESMF_LogWrite(trim(tmpstr), ESMF_LOGMSG_INFO, rc=dbrc)
-
     ! Use aflds to gather the halo updates of multiple fields
     ! Need to separate the scalar from the vector halo updates
     allocate(aflds(nx_block,ny_block,fldsToIce_num,nblocks))
@@ -1063,54 +1067,28 @@ module cice_cap_mod
       enddo
      enddo
     enddo
+    write(info, *) trim(subname)//' after halo update ssh i=1,2,3:', &
+     real(ssh(1,(jhi-jlo)+1,1),4),&
+     real(ssh(2,(jhi-jlo)+1,1),4),&
+     real(ssh(3,(jhi-jlo)+1,1),4)
+    call ESMF_LogWrite(info, ESMF_LOGMSG_INFO, rc=dbrc)
 
-    ! Now do vectors
-    aflds = 0._ESMF_KIND_R8
-    do iblk = 1, nblocks
+    write(info, *) trim(subname)//' after halo update ssh j=jhi-1,jhi,jhi+1:', &
+     real(ssh((ihi-ilo)+1,jhi-1,1),4),&
+     real(ssh((ihi-ilo)+1,jhi,  1),4),&
+     real(ssh((ihi-ilo)+1,jhi+1,1),4)
+    call ESMF_LogWrite(info, ESMF_LOGMSG_INFO, rc=dbrc)
+
+    !slopes of sea surface using filled halos in ssh
+    do iblk = 1,nblocks
        this_block = get_block(blocks_ice(iblk),iblk)
        ilo = this_block%ilo
        ihi = this_block%ihi
        jlo = this_block%jlo
        jhi = this_block%jhi
 
-       do j = jlo, jhi
-        do i = ilo, ihi
-         aflds(i,j, 1,iblk) =   uocn(i,j,iblk)
-         aflds(i,j, 2,iblk) =   vocn(i,j,iblk)
-         aflds(i,j, 3,iblk) =   uatm(i,j,iblk)
-         aflds(i,j, 4,iblk) =   vatm(i,j,iblk)
-        enddo
-       enddo
-    enddo
-
-    call ice_HaloUpdate(aflds, halo_info, field_loc_center, &
-                        field_type_vector)
-
-    do iblk = 1, nblocks
-      do j = 1,ny_block
-        do i = 1,nx_block
-         uocn (i,j,iblk)   = aflds(i,j, 1,iblk)
-         vocn (i,j,iblk)   = aflds(i,j, 2,iblk)
-         uatm (i,j,iblk)   = aflds(i,j, 3,iblk)
-         vatm (i,j,iblk)   = aflds(i,j, 4,iblk)
-        enddo    !i
-      enddo    !j
-    enddo     !iblk
-
-    ! now rotate onto local coordinates and find slopes 
-    do iblk = 1, nblocks
-      do j = 1,ny_block
-        do i = 1,nx_block
-          ue = uocn(i,j,iblk)
-          vn = vocn(i,j,iblk)
-          uocn(i,j,iblk) =  ue*cos(ANGLET(i,j,iblk)) + vn*sin(ANGLET(i,j,iblk))  ! ocean current
-          vocn(i,j,iblk) = -ue*sin(ANGLET(i,j,iblk)) + vn*cos(ANGLET(i,j,iblk))  ! ocean current
-          ue = uatm(i,j,iblk)
-          vn = vatm(i,j,iblk)
-          uatm(i,j,iblk) =  ue*cos(ANGLET(i,j,iblk)) + vn*sin(ANGLET(i,j,iblk))  ! wind u component
-          vatm(i,j,iblk) = -ue*sin(ANGLET(i,j,iblk)) + vn*cos(ANGLET(i,j,iblk))  ! wind v component
-          wind(i,j,iblk) = sqrt(uatm(i,j,iblk)**2 + vatm(i,j,iblk)**2)           ! wind speed
-
+       do j = jlo,jhi
+       do i = ilo,ihi
           ! zonal sea surface slope
           sigma_r = 0.5*(ssh(i+1,j+1,iblk)-ssh(i,j+1,iblk)+ ssh(i+1,j,iblk)-ssh(i,j,iblk))/dxt(i,j,iblk)
           sigma_l = 0.5*(ssh(i,j+1,iblk)-ssh(i-1,j+1,iblk)+ ssh(i,j,iblk)-ssh(i-1,j,iblk))/dxt(i,j,iblk)
@@ -1129,13 +1107,94 @@ module cice_cap_mod
           else
             ss_tlty(i,j,iblk) = 0.0
           endif
-          ! rotate onto local basis vectors
-          ue = ss_tltx   (i,j,iblk)
-          vn = ss_tlty   (i,j,iblk)
+       enddo    !i
+       enddo    !j
+    enddo     !iblk
+
+    write(info, *) trim(subname)//' before halo update uocn i=1,2,3:', &
+     real(uocn(1,(jhi-jlo)+1,1),4),&
+     real(uocn(2,(jhi-jlo)+1,1),4),&
+     real(uocn(3,(jhi-jlo)+1,1),4)
+    call ESMF_LogWrite(info, ESMF_LOGMSG_INFO, rc=dbrc)
+
+    write(info, *) trim(subname)//' before halo update uocn j=jhi-1,jhi,jhi+1:', &
+     real(uocn((ihi-ilo)+1,jhi-1,1),4),&
+     real(uocn((ihi-ilo)+1,jhi,  1),4),&
+     real(uocn((ihi-ilo)+1,jhi+1,1),4)
+    call ESMF_LogWrite(info, ESMF_LOGMSG_INFO, rc=dbrc)
+
+    ! Use aflds to gather the halo updates of multiple fields
+    aflds = 0._ESMF_KIND_R8
+    do iblk = 1, nblocks
+       this_block = get_block(blocks_ice(iblk),iblk)
+       ilo = this_block%ilo
+       ihi = this_block%ihi
+       jlo = this_block%jlo
+       jhi = this_block%jhi
+
+       do j = jlo, jhi
+        do i = ilo, ihi
+         aflds(i,j, 1,iblk) =    uocn(i,j,iblk)
+         aflds(i,j, 2,iblk) =    vocn(i,j,iblk)
+         aflds(i,j, 3,iblk) =    uatm(i,j,iblk)
+         aflds(i,j, 4,iblk) =    vatm(i,j,iblk)
+         aflds(i,j, 5,iblk) = ss_tltx(i,j,iblk)
+         aflds(i,j, 6,iblk) = ss_tlty(i,j,iblk)
+        enddo
+       enddo
+    enddo
+
+    call ice_HaloUpdate(aflds, halo_info, field_loc_center, &
+                        field_type_vector)
+
+    do iblk = 1, nblocks
+      do j = 1,ny_block
+        do i = 1,nx_block
+           uocn (i,j,iblk) = aflds(i,j, 1,iblk)
+           vocn (i,j,iblk) = aflds(i,j, 2,iblk)
+           uatm (i,j,iblk) = aflds(i,j, 3,iblk)
+           vatm (i,j,iblk) = aflds(i,j, 4,iblk)
+         ss_tltx(i,j,iblk) = aflds(i,j, 5,iblk)
+         ss_tlty(i,j,iblk) = aflds(i,j, 6,iblk)
+        enddo    !i
+      enddo    !j
+    write(info, *) trim(subname)//' after haloUpdate uocn i=1,2,3:', &
+     real(uocn(1,(jhi-jlo)+1,1),4),&
+     real(uocn(2,(jhi-jlo)+1,1),4),&
+     real(uocn(3,(jhi-jlo)+1,1),4)
+    call ESMF_LogWrite(info, ESMF_LOGMSG_INFO, rc=dbrc)
+
+    write(info, *) trim(subname)//' after haloUpdate uocn j=jhi-1,jhi,jhi+1:', &
+     real(uocn((ihi-ilo)+1,jhi-1,1),4),&
+     real(uocn((ihi-ilo)+1,jhi,  1),4),&
+     real(uocn((ihi-ilo)+1,jhi+1,1),4)
+    call ESMF_LogWrite(info, ESMF_LOGMSG_INFO, rc=dbrc)
+
+    enddo     !iblk
+
+    ! now rotate onto local coordinates 
+    do iblk = 1, nblocks
+      do j = 1,ny_block
+        do i = 1,nx_block
+          ue = uocn(i,j,iblk)
+          vn = vocn(i,j,iblk)
+          uocn(i,j,iblk) =  ue*cos(ANGLET(i,j,iblk)) + vn*sin(ANGLET(i,j,iblk))  ! ocean current
+          vocn(i,j,iblk) = -ue*sin(ANGLET(i,j,iblk)) + vn*cos(ANGLET(i,j,iblk))  ! ocean current
+          ue = uatm(i,j,iblk)
+          vn = vatm(i,j,iblk)
+          uatm(i,j,iblk) =  ue*cos(ANGLET(i,j,iblk)) + vn*sin(ANGLET(i,j,iblk))  ! wind u component
+          vatm(i,j,iblk) = -ue*sin(ANGLET(i,j,iblk)) + vn*cos(ANGLET(i,j,iblk))  ! wind v component
+          wind(i,j,iblk) = sqrt(uatm(i,j,iblk)**2 + vatm(i,j,iblk)**2)           ! wind speed
+          ue = ss_tltx(i,j,iblk)
+          vn = ss_tlty(i,j,iblk)
           ss_tltx(i,j,iblk) =  ue*cos(ANGLET(i,j,iblk)) + vn*sin(ANGLET(i,j,iblk))
           ss_tlty(i,j,iblk) = -ue*sin(ANGLET(i,j,iblk)) + vn*cos(ANGLET(i,j,iblk))
        enddo
        enddo
+    enddo
+
+    ! Interpolate ocean dynamics variables from T-cell centers to 
+    ! U-cell centers.
     ! Atmosphere variables are needed in T cell centers in
     ! subroutine stability and are interpolated to the U grid
     ! later as necessary.
@@ -1143,21 +1202,8 @@ module cice_cap_mod
        call t2ugrid_vector(vocn)
        call t2ugrid_vector(ss_tltx)
        call t2ugrid_vector(ss_tlty)
-    enddo
     deallocate(aflds)
     deallocate(ssh)
-
-    !write(info, *) trim(subname)//' uocn i=1,2,3:', &
-    ! real(uocn(1,(jhi-jlo)+1,1),4),&
-    ! real(uocn(2,(jhi-jlo)+1,1),4),&
-    ! real(uocn(3,(jhi-jlo)+1,1),4)
-    !call ESMF_LogWrite(info, ESMF_LOGMSG_INFO, rc=dbrc)
-
-    !write(info, *) trim(subname)//' uocn j=jhi-1,jhi,jhi+1:', &
-    ! real(uocn((ihi-ilo)+1,jhi-1,1),4),&
-    ! real(uocn((ihi-ilo)+1,jhi,  1),4),&
-    ! real(uocn((ihi-ilo)+1,jhi+1,1),4)
-    !call ESMF_LogWrite(info, ESMF_LOGMSG_INFO, rc=dbrc)
 
     write(info,*) trim(subname),' --- run phase 2 called --- '
     call ESMF_LogWrite(info, ESMF_LOGMSG_INFO, rc=dbrc)
@@ -1688,7 +1734,7 @@ module cice_cap_mod
     do n = 1, fieldCount
       call State_GetFldPtr(State, fieldNameList(n), dataPtr, rc=lrc)
       if (ESMF_LogFoundError(rcToCheck=lrc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
-      write(tmpstr,'(A,3g14.7)') trim(subname)//' '//trim(lstring)//':'//trim(fieldNameList(n)), &
+      write(tmpstr,'(A,3g14.7)') trim(subname)//' '//trim(lstring)//':'//trim(fieldNameList(n))//'  ', &
         minval(dataPtr),maxval(dataPtr),sum(dataPtr)
 !      write(tmpstr,'(A)') trim(subname)//' '//trim(lstring)//':'//trim(fieldNameList(n))
       call ESMF_LogWrite(trim(tmpstr), ESMF_LOGMSG_INFO, rc=dbrc)

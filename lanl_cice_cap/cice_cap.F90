@@ -777,6 +777,7 @@ module cice_cap_mod
   if(write_diagnostics) then
     import_slice = import_slice + 1
 
+    !call state_diagnose(importState, 'cice_import', rc)
 #if (1 == 0)
 !tcx causes core dumps and garbage
     call NUOPC_StateWrite(importState, filePrefix='field_ice_import_', &
@@ -992,32 +993,32 @@ module cice_cap_mod
        enddo
        enddo
     enddo
-    write(info, *) trim(subname)//' before halo update ssh i=1,2,3:', &
-     real(ssh(1,(jhi-jlo)+1,1),4),&
-     real(ssh(2,(jhi-jlo)+1,1),4),&
-     real(ssh(3,(jhi-jlo)+1,1),4)
-    call ESMF_LogWrite(info, ESMF_LOGMSG_INFO, rc=dbrc)
+    !write(info, *) trim(subname)//' before halo update ssh i=1,2,3:', &
+    ! real(ssh(1,(jhi-jlo)+1,1),4),&
+    ! real(ssh(2,(jhi-jlo)+1,1),4),&
+    ! real(ssh(3,(jhi-jlo)+1,1),4)
+    !call ESMF_LogWrite(info, ESMF_LOGMSG_INFO, rc=dbrc)
 
-    write(info, *) trim(subname)//' before halo update ssh j=jhi-1,jhi,jhi+1:', &
-     real(ssh((ihi-ilo)+1,jhi-1,1),4),&
-     real(ssh((ihi-ilo)+1,jhi,  1),4),&
-     real(ssh((ihi-ilo)+1,jhi+1,1),4)
-    call ESMF_LogWrite(info, ESMF_LOGMSG_INFO, rc=dbrc)
+    !write(info, *) trim(subname)//' before halo update ssh j=jhi-1,jhi,jhi+1:', &
+    ! real(ssh((ihi-ilo)+1,jhi-1,1),4),&
+    ! real(ssh((ihi-ilo)+1,jhi,  1),4),&
+    ! real(ssh((ihi-ilo)+1,jhi+1,1),4)
+    !call ESMF_LogWrite(info, ESMF_LOGMSG_INFO, rc=dbrc)
 
     call ice_HaloUpdate(ssh, halo_info, field_loc_center, &
                         field_type_scalar)
 
-    write(info, *) trim(subname)//' after halo update ssh i=1,2,3:', &
-     real(ssh(1,(jhi-jlo)+1,1),4),&
-     real(ssh(2,(jhi-jlo)+1,1),4),&
-     real(ssh(3,(jhi-jlo)+1,1),4)
-    call ESMF_LogWrite(info, ESMF_LOGMSG_INFO, rc=dbrc)
+    !write(info, *) trim(subname)//' after halo update ssh i=1,2,3:', &
+    ! real(ssh(1,(jhi-jlo)+1,1),4),&
+    ! real(ssh(2,(jhi-jlo)+1,1),4),&
+    ! real(ssh(3,(jhi-jlo)+1,1),4)
+    !call ESMF_LogWrite(info, ESMF_LOGMSG_INFO, rc=dbrc)
 
-    write(info, *) trim(subname)//' after halo update ssh j=jhi-1,jhi,jhi+1:', &
-     real(ssh((ihi-ilo)+1,jhi-1,1),4),&
-     real(ssh((ihi-ilo)+1,jhi,  1),4),&
-     real(ssh((ihi-ilo)+1,jhi+1,1),4)
-    call ESMF_LogWrite(info, ESMF_LOGMSG_INFO, rc=dbrc)
+    !write(info, *) trim(subname)//' after halo update ssh j=jhi-1,jhi,jhi+1:', &
+    ! real(ssh((ihi-ilo)+1,jhi-1,1),4),&
+    ! real(ssh((ihi-ilo)+1,jhi,  1),4),&
+    ! real(ssh((ihi-ilo)+1,jhi+1,1),4)
+    !call ESMF_LogWrite(info, ESMF_LOGMSG_INFO, rc=dbrc)
 
     !slopes of sea surface using filled halos in ssh
     ss_tltx = 0._ESMF_KIND_R8
@@ -1028,6 +1029,10 @@ module cice_cap_mod
        ihi = this_block%ihi
        jlo = this_block%jlo
        jhi = this_block%jhi
+
+    write(info, *) trim(subname)//' iblk,ilo,ihi,jlo,jhi at Rotation:', &
+                  iblk,ilo,ihi,jlo,jhi
+    call ESMF_LogWrite(info, ESMF_LOGMSG_INFO, rc=dbrc)
 
        do j = jlo,jhi
        do i = ilo,ihi
@@ -1052,16 +1057,45 @@ module cice_cap_mod
        enddo    !i
        enddo    !j
     enddo     !iblk
-    write(info, *) trim(subname)//' ss_tlty i=1,2,3:', &
-     real(ss_tlty(1,(jhi-jlo)+1,1),4),&
-     real(ss_tlty(2,(jhi-jlo)+1,1),4),&
-     real(ss_tlty(3,(jhi-jlo)+1,1),4)
-    call ESMF_LogWrite(info, ESMF_LOGMSG_INFO, rc=dbrc)
 
-    write(info, *) trim(subname)//' ss_tlty j=jhi-1,jhi,jhi+1:', &
-     real(ss_tlty((ihi-ilo)+1,jhi-1,1),4),&
-     real(ss_tlty((ihi-ilo)+1,jhi,  1),4),&
-     real(ss_tlty((ihi-ilo)+1,jhi+1,1),4)
+    !write(info, *) trim(subname)//' ss_tltx i=1,2,3:', &
+    ! real(ss_tltx(1,(jhi-jlo)+1,1),4),&
+    ! real(ss_tltx(2,(jhi-jlo)+1,1),4),&
+    ! real(ss_tltx(3,(jhi-jlo)+1,1),4)
+    !call ESMF_LogWrite(info, ESMF_LOGMSG_INFO, rc=dbrc)
+    !write(info, *) trim(subname)//' ss_tltx j=jhi-1,jhi,jhi+1:', &
+    ! real(ss_tltx((ihi-ilo)+1,jhi-1,1),4),&
+    ! real(ss_tltx((ihi-ilo)+1,jhi,  1),4),&
+    ! real(ss_tltx((ihi-ilo)+1,jhi+1,1),4)
+    !call ESMF_LogWrite(info, ESMF_LOGMSG_INFO, rc=dbrc)
+
+    write(tmpstr,*) trim(subname)//' before rot uatm = ',minval(uatm),maxval(uatm)
+    call ESMF_LogWrite(trim(tmpstr), ESMF_LOGMSG_INFO, rc=dbrc)
+    write(tmpstr,*) trim(subname)//' before rot vatm = ',minval(vatm),maxval(vatm)
+    call ESMF_LogWrite(trim(tmpstr), ESMF_LOGMSG_INFO, rc=dbrc)
+
+    write(tmpstr,*) trim(subname)//' before rot uocn = ',minval(uocn),maxval(uocn)
+    call ESMF_LogWrite(trim(tmpstr), ESMF_LOGMSG_INFO, rc=dbrc)
+    write(tmpstr,*) trim(subname)//' before rot vocn = ',minval(vocn),maxval(vocn)
+    call ESMF_LogWrite(trim(tmpstr), ESMF_LOGMSG_INFO, rc=dbrc)
+
+    write(tmpstr,*) trim(subname)//' before rot ss_tltx = ',minval(ss_tltx),maxval(ss_tltx)
+    call ESMF_LogWrite(trim(tmpstr), ESMF_LOGMSG_INFO, rc=dbrc)
+    write(tmpstr,*) trim(subname)//' before rot ss_tlty = ',minval(ss_tlty),maxval(ss_tlty)
+    call ESMF_LogWrite(trim(tmpstr), ESMF_LOGMSG_INFO, rc=dbrc)
+
+    write(tmpstr,*) trim(subname)//' before rot ANGLET = ',minval(anglet),maxval(anglet)
+    call ESMF_LogWrite(trim(tmpstr), ESMF_LOGMSG_INFO, rc=dbrc)
+
+    write(info, *) trim(subname)//' dataPtr_ocncz size :', &
+      lbound(dataPtr_ocncz,1), ubound(dataPtr_ocncz,1), &
+      lbound(dataPtr_ocncz,2), ubound(dataPtr_ocncz,2), &
+      lbound(dataPtr_ocncz,3), ubound(dataPtr_ocncz,3)
+    call ESMF_LogWrite(info, ESMF_LOGMSG_INFO, rc=dbrc)
+    write(info, *) trim(subname)//' ss_tltx size :', &
+      lbound(ss_tltx,1), ubound(ss_tltx,1), &
+      lbound(ss_tltx,2), ubound(ss_tltx,2), &
+      lbound(ss_tltx,3), ubound(ss_tltx,3)
     call ESMF_LogWrite(info, ESMF_LOGMSG_INFO, rc=dbrc)
 
     ! rotate all vectors from east/north to i/j
@@ -1086,13 +1120,28 @@ module cice_cap_mod
           vn = dataPtr_vbot  (i1,j1,iblk)
           uatm   (i,j,iblk) =  ue*cos(ANGLET(i,j,iblk)) + vn*sin(ANGLET(i,j,iblk))  ! wind u component
           vatm   (i,j,iblk) = -ue*sin(ANGLET(i,j,iblk)) + vn*cos(ANGLET(i,j,iblk))  ! wind v component
-          ue = ss_tltx  (i1,j1,iblk)
-          vn = ss_tlty  (i1,j1,iblk)
+
+          ue = ss_tltx  (i,j,iblk)
+          vn = ss_tlty  (i,j,iblk)
           ss_tltx(i,j,iblk) =  ue*cos(ANGLET(i,j,iblk)) + vn*sin(ANGLET(i,j,iblk))
           ss_tlty(i,j,iblk) = -ue*sin(ANGLET(i,j,iblk)) + vn*cos(ANGLET(i,j,iblk))
        enddo    !i
        enddo    !j
     enddo     !iblk
+    write(tmpstr,*) trim(subname)//' after rot uatm = ',minval(uatm),maxval(uatm)
+    call ESMF_LogWrite(trim(tmpstr), ESMF_LOGMSG_INFO, rc=dbrc)
+    write(tmpstr,*) trim(subname)//' after rot vatm = ',minval(vatm),maxval(vatm)
+    call ESMF_LogWrite(trim(tmpstr), ESMF_LOGMSG_INFO, rc=dbrc)
+
+    write(tmpstr,*) trim(subname)//' after rot uocn = ',minval(uocn),maxval(uocn)
+    call ESMF_LogWrite(trim(tmpstr), ESMF_LOGMSG_INFO, rc=dbrc)
+    write(tmpstr,*) trim(subname)//' after rot vocn = ',minval(vocn),maxval(vocn)
+    call ESMF_LogWrite(trim(tmpstr), ESMF_LOGMSG_INFO, rc=dbrc)
+
+    write(tmpstr,*) trim(subname)//' after rot ss_tltx = ',minval(ss_tltx),maxval(ss_tltx)
+    call ESMF_LogWrite(trim(tmpstr), ESMF_LOGMSG_INFO, rc=dbrc)
+    write(tmpstr,*) trim(subname)//' after rot ss_tlty = ',minval(ss_tlty),maxval(ss_tlty)
+    call ESMF_LogWrite(trim(tmpstr), ESMF_LOGMSG_INFO, rc=dbrc)
 
     ! Atmosphere variables are needed in T cell centers in
     ! subroutine stability and are interpolated to the U grid
@@ -1102,15 +1151,47 @@ module cice_cap_mod
     call ice_HaloUpdate(vatm, halo_info, field_loc_center, &
                         field_type_vector)
 
+    call ice_HaloUpdate(uocn, halo_info, field_loc_center, &
+                        field_type_vector)
+    call ice_HaloUpdate(vocn, halo_info, field_loc_center, &
+                        field_type_vector)
+
+    call ice_HaloUpdate(ss_tltx, halo_info, field_loc_center, &
+                        field_type_vector)
+    call ice_HaloUpdate(ss_tlty, halo_info, field_loc_center, &
+                        field_type_vector)
+
+    write(info, *) trim(subname)//' after  haloupdate uocn i=1,2,3:', &
+     real(uocn(1,(jhi-jlo)+1,1),4),&
+     real(uocn(2,(jhi-jlo)+1,1),4),&
+     real(uocn(3,(jhi-jlo)+1,1),4)
+    call ESMF_LogWrite(info, ESMF_LOGMSG_INFO, rc=dbrc)
+       
+    write(info, *) trim(subname)//' after  haloupdate uocn j=jhi-1,jhi,jhi+1:', &
+     real(uocn((ihi-ilo)+1,jhi-1,1),4),&
+     real(uocn((ihi-ilo)+1,jhi,  1),4),&
+     real(uocn((ihi-ilo)+1,jhi+1,1),4)
+    call ESMF_LogWrite(info, ESMF_LOGMSG_INFO, rc=dbrc)
+
+    write(info, *) trim(subname)//' after  haloupdate ss_tlty i=1,2,3:', &
+     real(ss_tlty(1,(jhi-jlo)+1,1),4),&
+     real(ss_tlty(2,(jhi-jlo)+1,1),4),&
+     real(ss_tlty(3,(jhi-jlo)+1,1),4)
+    call ESMF_LogWrite(info, ESMF_LOGMSG_INFO, rc=dbrc)
+
+    write(info, *) trim(subname)//' after  haloupdate ss_tlty j=jhi-1,jhi,jhi+1:', &
+     real(ss_tlty((ihi-ilo)+1,jhi-1,1),4),&
+     real(ss_tlty((ihi-ilo)+1,jhi,  1),4),&
+     real(ss_tlty((ihi-ilo)+1,jhi+1,1),4)
+    call ESMF_LogWrite(info, ESMF_LOGMSG_INFO, rc=dbrc)
     ! Interpolate ocean dynamics variables from T-cell centers to 
     ! U-cell centers.
-    ! call to t2ugrid_vector does halo update internally, so 
-    ! no need to update halos first
        call t2ugrid_vector(uocn)
        call t2ugrid_vector(vocn)
        call t2ugrid_vector(ss_tltx)
        call t2ugrid_vector(ss_tlty)
 
+#ifdef test
     ! check halos
     do iblk = 1,nblocks
        this_block = get_block(blocks_ice(iblk),iblk)
@@ -1119,55 +1200,78 @@ module cice_cap_mod
        jlo = this_block%jlo
        jhi = this_block%jhi
 
-    write(info, *) trim(subname)//' after halo update uocn i=1,2,3:', &
+    write(info, *) trim(subname)//' after  t2ugrid uatm i=1,2,3:', &
+     real(uatm(1,(jhi-jlo)+1,1),4),&
+     real(uatm(2,(jhi-jlo)+1,1),4),&
+     real(uatm(3,(jhi-jlo)+1,1),4)
+    call ESMF_LogWrite(info, ESMF_LOGMSG_INFO, rc=dbrc)
+
+    write(info, *) trim(subname)//' after  t2ugrid uatm j=jhi-1,jhi,jhi+1:', &
+     real(uatm((ihi-ilo)+1,jhi-1,1),4),&
+     real(uatm((ihi-ilo)+1,jhi,  1),4),&
+     real(uatm((ihi-ilo)+1,jhi+1,1),4)
+    call ESMF_LogWrite(info, ESMF_LOGMSG_INFO, rc=dbrc)
+
+    write(info, *) trim(subname)//' after  t2ugrid uocn i=1,2,3:', &
      real(uocn(1,(jhi-jlo)+1,1),4),&
      real(uocn(2,(jhi-jlo)+1,1),4),&
      real(uocn(3,(jhi-jlo)+1,1),4)
     call ESMF_LogWrite(info, ESMF_LOGMSG_INFO, rc=dbrc)
        
-    write(info, *) trim(subname)//' after halo update uocn j=jhi-1,jhi,jhi+1:', &
+    write(info, *) trim(subname)//' after  t2ugrid uocn j=jhi-1,jhi,jhi+1:', &
      real(uocn((ihi-ilo)+1,jhi-1,1),4),&
      real(uocn((ihi-ilo)+1,jhi,  1),4),&
      real(uocn((ihi-ilo)+1,jhi+1,1),4)
     call ESMF_LogWrite(info, ESMF_LOGMSG_INFO, rc=dbrc)
 
-    write(info, *) trim(subname)//' after halo update vocn i=1,2,3:', &
-     real(vocn(1,(jhi-jlo)+1,1),4),&
-     real(vocn(2,(jhi-jlo)+1,1),4),&
-     real(vocn(3,(jhi-jlo)+1,1),4)
-    call ESMF_LogWrite(info, ESMF_LOGMSG_INFO, rc=dbrc)
-
-    write(info, *) trim(subname)//' after halo update vocn j=jhi-1,jhi,jhi+1:', &
-     real(vocn((ihi-ilo)+1,jhi-1,1),4),&
-     real(vocn((ihi-ilo)+1,jhi,  1),4),&
-     real(vocn((ihi-ilo)+1,jhi+1,1),4)
-    call ESMF_LogWrite(info, ESMF_LOGMSG_INFO, rc=dbrc)
-
-
-    write(info, *) trim(subname)//' after halo update ss_tltx i=1,2,3:', &
-     real(ss_tltx(1,(jhi-jlo)+1,1),4),&
-     real(ss_tltx(2,(jhi-jlo)+1,1),4),&
-     real(ss_tltx(3,(jhi-jlo)+1,1),4)
-    call ESMF_LogWrite(info, ESMF_LOGMSG_INFO, rc=dbrc)
-
-    write(info, *) trim(subname)//' after halo update ss_tltx j=jhi-1,jhi,jhi+1:', &
-     real(ss_tltx((ihi-ilo)+1,jhi-1,1),4),&
-     real(ss_tltx((ihi-ilo)+1,jhi,  1),4),&
-     real(ss_tltx((ihi-ilo)+1,jhi+1,1),4)
-    call ESMF_LogWrite(info, ESMF_LOGMSG_INFO, rc=dbrc)
-
-    write(info, *) trim(subname)//' after halo update ss_tlty i=1,2,3:', &
+    write(info, *) trim(subname)//' after  t2ugrid ss_tlty i=1,2,3:', &
      real(ss_tlty(1,(jhi-jlo)+1,1),4),&
      real(ss_tlty(2,(jhi-jlo)+1,1),4),&
      real(ss_tlty(3,(jhi-jlo)+1,1),4)
     call ESMF_LogWrite(info, ESMF_LOGMSG_INFO, rc=dbrc)
 
-    write(info, *) trim(subname)//' after halo update ss_tlty j=jhi-1,jhi,jhi+1:', &
+    write(info, *) trim(subname)//' after  t2ugrid ss_tlty j=jhi-1,jhi,jhi+1:', &
+     real(ss_tlty((ihi-ilo)+1,jhi-1,1),4),&
+     real(ss_tlty((ihi-ilo)+1,jhi,  1),4),&
+     real(ss_tlty((ihi-ilo)+1,jhi+1,1),4)
+    call ESMF_LogWrite(info, ESMF_LOGMSG_INFO, rc=dbrc)
+    write(info, *) trim(subname)//' after  t2ugrid vocn i=1,2,3:', &
+     real(vocn(1,(jhi-jlo)+1,1),4),&
+     real(vocn(2,(jhi-jlo)+1,1),4),&
+     real(vocn(3,(jhi-jlo)+1,1),4)
+    call ESMF_LogWrite(info, ESMF_LOGMSG_INFO, rc=dbrc)
+
+    write(info, *) trim(subname)//' after  t2ugrid vocn j=jhi-1,jhi,jhi+1:', &
+     real(vocn((ihi-ilo)+1,jhi-1,1),4),&
+     real(vocn((ihi-ilo)+1,jhi,  1),4),&
+     real(vocn((ihi-ilo)+1,jhi+1,1),4)
+    call ESMF_LogWrite(info, ESMF_LOGMSG_INFO, rc=dbrc)
+
+    write(info, *) trim(subname)//' after  t2ugrid ss_tltx i=1,2,3:', &
+     real(ss_tltx(1,(jhi-jlo)+1,1),4),&
+     real(ss_tltx(2,(jhi-jlo)+1,1),4),&
+     real(ss_tltx(3,(jhi-jlo)+1,1),4)
+    call ESMF_LogWrite(info, ESMF_LOGMSG_INFO, rc=dbrc)
+
+    write(info, *) trim(subname)//' after  t2ugrid ss_tltx j=jhi-1,jhi,jhi+1:', &
+     real(ss_tltx((ihi-ilo)+1,jhi-1,1),4),&
+     real(ss_tltx((ihi-ilo)+1,jhi,  1),4),&
+     real(ss_tltx((ihi-ilo)+1,jhi+1,1),4)
+    call ESMF_LogWrite(info, ESMF_LOGMSG_INFO, rc=dbrc)
+
+    write(info, *) trim(subname)//' after  t2ugrid ss_tlty i=1,2,3:', &
+     real(ss_tlty(1,(jhi-jlo)+1,1),4),&
+     real(ss_tlty(2,(jhi-jlo)+1,1),4),&
+     real(ss_tlty(3,(jhi-jlo)+1,1),4)
+    call ESMF_LogWrite(info, ESMF_LOGMSG_INFO, rc=dbrc)
+
+    write(info, *) trim(subname)//' after  t2ugrid ss_tlty j=jhi-1,jhi,jhi+1:', &
      real(ss_tlty((ihi-ilo)+1,jhi-1,1),4),&
      real(ss_tlty((ihi-ilo)+1,jhi,  1),4),&
      real(ss_tlty((ihi-ilo)+1,jhi+1,1),4)
     call ESMF_LogWrite(info, ESMF_LOGMSG_INFO, rc=dbrc)
     enddo     !iblk
+#endif
 
     deallocate(ssh)
 

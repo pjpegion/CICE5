@@ -10,7 +10,9 @@
 !  * `GridAttachArea` - when set to "true", this option indicates that CICE grid attaches cell area
 !   using internal values computed in CICE. The default value is "false", so grid cell area will
 !   be computed in ESMF.
- 
+! 9/24/18: Denise Worthen (denise.worthen@noaa.gov)
+! * corrected calculation of sea surface slope gradients across PET boundaries; corrected vector halo
+!   filling for move to CICE U-grid 
 module cice_cap_mod
 
   use ice_blocks, only: nx_block, ny_block, nblocks_tot, block, get_block, &
@@ -23,7 +25,7 @@ module cice_cap_mod
   use ice_flux
   use ice_grid, only: TLAT, TLON, ULAT, ULON, hm, tarea, ANGLET, ANGLE, &
                       dxt, dyt, t2ugrid_vector
-  use ice_constants, only: field_loc_center, field_type_scalar, field_type_vector
+  use ice_constants, only: field_loc_center, field_loc_NEcorner, field_type_scalar, field_type_vector
   use ice_boundary, only: ice_HaloUpdate
 
   use ice_state
@@ -77,7 +79,8 @@ module cice_cap_mod
   logical :: write_diagnostics = .false.
   logical :: profile_memory = .false.
   logical :: grid_attach_area = .false.
-
+  ! local helper flag for halo debugging
+  logical :: HaloDebug = .false.
   contains
   !-----------------------------------------------------------------------
   !------------------- CICE code starts here -----------------------
@@ -725,7 +728,6 @@ module cice_cap_mod
     if(profile_memory) call ESMF_VMLogMemInfo("Entering CICE Model_ADVANCE: ")
     write(info,*) trim(subname),' --- run phase 1 called --- '
     call ESMF_LogWrite(info, ESMF_LOGMSG_INFO, rc=dbrc)
-
     
     ! query the Component for its clock, importState and exportState
     call ESMF_GridCompGet(gcomp, clock=clock, importState=importState, &
@@ -942,6 +944,7 @@ module cice_cap_mod
        enddo
     enddo !iblk
 
+    if(HaloDebug)then
     ! check halos
     do iblk = 1,nblocks
        this_block = get_block(blocks_ice(iblk),iblk)
@@ -962,10 +965,12 @@ module cice_cap_mod
      real(ssh((ihi-ilo)+1,jhi+1,1),4)
     call ESMF_LogWrite(info, ESMF_LOGMSG_INFO, rc=dbrc)
     enddo !iblk
+    endif !HaloDebug
 
     call ice_HaloUpdate(ssh, halo_info, field_loc_center, &
                         field_type_scalar)
 
+    if(HaloDebug)then
     ! check halos
     do iblk = 1,nblocks
        this_block = get_block(blocks_ice(iblk),iblk)
@@ -992,6 +997,7 @@ module cice_cap_mod
       lbound(ss_tltx,2), ubound(ss_tltx,2), &
       lbound(ss_tltx,3), ubound(ss_tltx,3)
     call ESMF_LogWrite(info, ESMF_LOGMSG_INFO, rc=dbrc)
+    endif !HaloDebug
 
     !slopes of sea surface using filled halos in ssh
     ss_tltx = 0._ESMF_KIND_R8
@@ -1105,23 +1111,80 @@ module cice_cap_mod
           !endif
 
           ! rotate onto local basis vectors
-          ! ss_tltx,ss_tlty are native cice grid variables but halos are empty (above)
+          ! ss_tltx,ss_tlty are native cice grid variables but halos are empty (see above)
           ue = ss_tltx   (i,j,iblk)
           vn = ss_tlty   (i,j,iblk)
           ss_tltx(i,j,iblk) =  ue*cos(ANGLET(i,j,iblk)) + vn*sin(ANGLET(i,j,iblk))
           ss_tlty(i,j,iblk) = -ue*sin(ANGLET(i,j,iblk)) + vn*cos(ANGLET(i,j,iblk))
        enddo
        enddo
+
+    ! From cesm driver:
     ! Interpolate ocean dynamics variables from T-cell centers to
     ! U-cell centers.
     ! Atmosphere variables are needed in T cell centers in
     ! subroutine stability and are interpolated to the U grid
     ! later as necessary.
-       !call t2ugrid_vector(uocn)
-       !call t2ugrid_vector(vocn)
-       !call t2ugrid_vector(ss_tltx)
-       !call t2ugrid_vector(ss_tlty)
+       call t2ugrid_vector(uocn)
+       call t2ugrid_vector(vocn)
+       call t2ugrid_vector(ss_tltx)
+       call t2ugrid_vector(ss_tlty)
     enddo
+
+    if(HaloDebug)then
+    ! check halos; should be filled by t2ugrid call!
+    do iblk = 1,nblocks
+       this_block = get_block(blocks_ice(iblk),iblk)
+       ilo = this_block%ilo
+       ihi = this_block%ihi
+       jlo = this_block%jlo
+       jhi = this_block%jhi
+
+    write(info, *) trim(subname)//' before halo update ss_tltx i=1,2,3:', &
+     real(ss_tltx(1,(jhi-jlo)+1,1),4),&
+     real(ss_tltx(2,(jhi-jlo)+1,1),4),&
+     real(ss_tltx(3,(jhi-jlo)+1,1),4)
+    call ESMF_LogWrite(info, ESMF_LOGMSG_INFO, rc=dbrc)
+
+    write(info, *) trim(subname)//' before halo update ss_tltx j=jhi-1,jhi,jhi+1:', &
+     real(ss_tltx((ihi-ilo)+1,jhi-1,1),4),&
+     real(ss_tltx((ihi-ilo)+1,jhi,  1),4),&
+     real(ss_tltx((ihi-ilo)+1,jhi+1,1),4)
+    call ESMF_LogWrite(info, ESMF_LOGMSG_INFO, rc=dbrc)
+    enddo !iblk
+    endif !HaloDebug
+
+    call ice_HaloUpdate(ss_tltx, halo_info, field_loc_NEcorner, &
+                        field_type_vector)
+    call ice_HaloUpdate(ss_tlty, halo_info, field_loc_NEcorner, &
+                        field_type_vector)
+    call ice_HaloUpdate(   uocn, halo_info, field_loc_NEcorner, &
+                        field_type_vector)
+    call ice_HaloUpdate(   vocn, halo_info, field_loc_NEcorner, &
+                        field_type_vector)
+
+    if(HaloDebug)then
+    ! check halos; why aren't they filled by t2ugrid call?
+    do iblk = 1,nblocks
+       this_block = get_block(blocks_ice(iblk),iblk)
+       ilo = this_block%ilo
+       ihi = this_block%ihi
+       jlo = this_block%jlo
+       jhi = this_block%jhi
+
+    write(info, *) trim(subname)//' after halo update ss_tltx i=1,2,3:', &
+     real(ss_tltx(1,(jhi-jlo)+1,1),4),&
+     real(ss_tltx(2,(jhi-jlo)+1,1),4),&
+     real(ss_tltx(3,(jhi-jlo)+1,1),4)
+    call ESMF_LogWrite(info, ESMF_LOGMSG_INFO, rc=dbrc)
+
+    write(info, *) trim(subname)//' after halo update ss_tltx j=jhi-1,jhi,jhi+1:', &
+     real(ss_tltx((ihi-ilo)+1,jhi-1,1),4),&
+     real(ss_tltx((ihi-ilo)+1,jhi,  1),4),&
+     real(ss_tltx((ihi-ilo)+1,jhi+1,1),4)
+    call ESMF_LogWrite(info, ESMF_LOGMSG_INFO, rc=dbrc)
+    enddo !iblk
+    endif !HaloDebug
 
     write(info,*) trim(subname),' --- run phase 2 called --- '
     call ESMF_LogWrite(info, ESMF_LOGMSG_INFO, rc=dbrc)
@@ -1249,13 +1312,6 @@ module cice_cap_mod
 !          dataPtr_strocnj(i1,j1,iblk) = vj
 !!          write(tmpstr,'(a,3i6,2x,g17.7)') trim(subname)//' aice = ',i,j,iblk,dataPtr_ifrac(i,j,iblk)
 !!          call ESMF_LogWrite(trim(tmpstr), ESMF_LOGMSG_INFO, rc=dbrc)
-!#ifdef test
-! reset values to zero!
-          dataPtr_strairxT(i1,j1,iblk) = 0.0
-          dataPtr_strairyT(i1,j1,iblk) = 0.0
-          dataPtr_strocnxT(i1,j1,iblk) = 0.0
-          dataPtr_strocnyT(i1,j1,iblk) = 0.0
-!#endif
        enddo
        enddo
     enddo

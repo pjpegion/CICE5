@@ -780,7 +780,7 @@ module cice_cap_mod
   if(write_diagnostics) then
     import_slice = import_slice + 1
 
-    !call state_diagnose(importState, 'cice_import', rc)
+    call state_diagnose(importState, 'cice_import', rc)
 #if (1 == 0)
 !tcx causes core dumps and garbage
     call NUOPC_StateWrite(importState, filePrefix='field_ice_import_', &
@@ -1390,8 +1390,6 @@ module cice_cap_mod
   endif  ! write_diagnostics 
     write(info,*) trim(subname),' --- run phase 4 called --- ',rc
     call ESMF_LogWrite(info, ESMF_LOGMSG_INFO, rc=dbrc)
-#ifdef test
-
 ! Dump out all the cice internal fields to cross-examine with those connected with mediator
 ! This will help to determine roughly which fields can be hooked into cice
 
@@ -1473,15 +1471,6 @@ module cice_cap_mod
    call dumpCICEInternal(ice_grid_i, export_slice, "xx_2m_atm_ref_temperature", "will provide", Tref_ocn)
    call dumpCICEInternal(ice_grid_i, export_slice, "xx_2m_atm_ref_spec_humidity", "will provide", Qref_ocn)
    if(profile_memory) call ESMF_VMLogMemInfo("Leaving CICE Model_ADVANCE: ")
-#endif
-   import_slice = import_slice + 1
-   call dumpCICEInternal(ice_grid_i, import_slice, "inst_pres_height_surface" , "will provide", zlvl)
-   call dumpCICEInternal(ice_grid_i, import_slice, "sea_surface_slope_zonal", "will provide", ss_tltx)
-   call dumpCICEInternal(ice_grid_i, import_slice, "sea_surface_slope_merid", "will provide", ss_tlty)
-   call dumpCICEInternal(ice_grid_i, import_slice, "ocn_current_zonal", "will provide", uocn)
-   call dumpCICEInternal(ice_grid_i, import_slice, "ocn_current_merid", "will provide", vocn)
-   call dumpCICEInternal(ice_grid_i, import_slice, "inst_zonal_wind_height_lowest", "will provide", uatm)
-   call dumpCICEInternal(ice_grid_i, import_slice, "inst_merid_wind_height_lowest", "will provide", vatm)
 
   end subroutine 
 
@@ -2009,7 +1998,7 @@ module cice_cap_mod
     real(ESMF_KIND_R8), dimension(:,:), pointer  :: f2d
     integer                  :: i,j,rc
 
-    !if(.not. write_diagnostics) return ! remove this line to debug field connection
+    if(.not. write_diagnostics) return ! remove this line to debug field connection
 
     field = ESMF_FieldCreate(grid, ESMF_TYPEKIND_R8, &
       indexflag=ESMF_INDEX_DELOCAL, &

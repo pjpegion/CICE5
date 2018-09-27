@@ -7,7 +7,7 @@ program generate_cice_fix_file
 #define output_grid_qdeg
 ! writes out additional variables not needed by CICE but which can be 
 ! helpful in diagnosing grid generation errors
-#define debug
+!#define debug_output
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 ! this code generate CICE gird fixed file based on MOM6 ocean_hgrid.nc
 ! information on MOM6 supergrid can be found at
@@ -95,7 +95,7 @@ program generate_cice_fix_file
 #endif
 #ifdef output_grid_qdeg
   integer, parameter :: ni = 1440, nj = 1080
-  character(len=256) :: dirsrc = '/scratch4/NCEPDEV/nems/noscrub/emc.nemspara/RT/FV3-MOM6-CICE5/master-20180821/MOM6_FIX_025deg/'
+  character(len=256) :: dirsrc = '/scratch4/NCEPDEV/nems/noscrub/emc.nemspara/RT/FV3-MOM6-CICE5/benchmark-20180913/MOM6_FIX_025deg/'
   character(len=256) :: dirout = './'
   character(len= 10) :: res = 'mx025'
 
@@ -110,20 +110,24 @@ program generate_cice_fix_file
   real(kind=8), dimension(0:nx,0:ny)   :: x, y, angq 
   real(kind=8), dimension(  nx,0:ny)   :: dx
   real(kind=8), dimension(0:nx,  ny)   :: dy
+
+  !super-grid replicate row 
+  real(kind=8), dimension(0:nx,0:ny+1) :: xsgp1, ysgp1
+
   ! required CICE grid variables
   integer, parameter :: nreqd = 6  ! 5 required, +1 for kmt
 
   real(kind=8), dimension(ni,nj) :: ulon, ulat 
   real(kind=8), dimension(ni,nj) ::  htn, hte
   real(kind=8), dimension(ni,nj) :: angle
-#ifdef debug
+
   integer, parameter :: nxtra = 7
 
   real(kind=8), dimension(ni,nj) ::  latT, lonT  ! lat and lon of T on C-grid
   real(kind=8), dimension(ni,nj) :: latCv, lonCv ! lat and lon of V on C-grid
   real(kind=8), dimension(ni,nj) :: latCu, lonCu ! lat and lon of U on C-grid
   real(kind=8), dimension(ni,nj) :: anglet
-
+#ifdef debug_output
   integer, parameter :: ncice = nreqd + nxtra
 #else
   integer, parameter :: ncice = nreqd 
@@ -140,14 +144,20 @@ program generate_cice_fix_file
   character(len=256) :: history
   character(len=  8) :: cdate
 
-  real(kind=8) :: lon_scale
+  ! from geolonB fix in MOM6
+  real(kind=8) :: len_lon ! The periodic range of longitudes, usually 360 degrees.
+  real(kind=8) :: pi_720deg ! One quarter the conversion factor from degrees to radians.
+  real(kind=8) :: lonB(2,2)  ! The longitude of a point, shifted to have about the same value.
+  real(kind=8) :: lon_scale 
+
   integer :: status,ncid,xtype
   integer :: id, vardim(2)
   integer :: ni_dim,nj_dim
-  integer :: i,j,ii,jj,i2,j2
+  integer :: i,j,n,m,ii,jj,i2,j2
   integer :: ipole(2),i1
   integer :: system
 
+  real(kind=8) :: modulo_around_point
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 ! get the mask 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -189,19 +199,94 @@ program generate_cice_fix_file
   status = nf90_get_var(ncid,     id, dy)
   status = nf90_close(ncid)
 
-  do j=1,ny-1 ; do i=1,nx-1
-    lon_scale    = cos((y(i-1,j-1) + y(i+1,j-1  ) + &
-                        y(i-1,j+1) + y(i+1,j+1)) * atan(1.0)/180)
-    angq(i,j)    = atan2((x(i-1,j+1) + x(i+1,j+1) - &
-                          x(i-1,j-1) - x(i+1,j-1))*lon_scale, &
-                          y(i-1,j+1) + y(i+1,j+1) - &
-                          y(i-1,j-1) - y(i+1,j-1) )
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! to find angleq on seam, replicate supergrid values across seam
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+  !pole on supergrid
+  ipole = -1
+      j = ny
+  do i = 1,nx/2
+   if(y(i,j) .eq. 90.0)ipole(1) = i
+  enddo
+  do i = nx/2+1,nx
+   if(y(i,j) .eq. 90.0)ipole(2) = i
+  enddo
+  print *,'poles found at ',ipole
+
+  xsgp1(:,0:ny) = x(:,0:ny)
+  ysgp1(:,0:ny) = y(:,0:ny)
+  
+  !check
+  do i = ipole(1)-5,ipole(1)+5
+   i2 = ipole(2)+(ipole(1)-i)+1
+   print *,i,i2
+  enddo
+   print *
+  do i = ipole(2)-5,ipole(2)+5
+   i2 = ipole(2)+(ipole(1)-i)+1
+   print *,i,i2
+  enddo
+
+  !replicate supergrid across pole
+  do i = 1,nx
+    i2 = ipole(2)+(ipole(1)-i)
+   xsgp1(i,ny+1) = xsgp1(i2,ny)
+   ysgp1(i,ny+1) = ysgp1(i2,ny)
+  enddo
+ 
+  !check  
+   j = ny+1
+  i1 = ipole(1); i2 = ipole(2)-(ipole(1)-i1)
+  print *,'replicate X across seam on SG'
+  print *,xsgp1(i1-2,j),xsgp1(i2+2,j)
+  print *,xsgp1(i1-1,j),xsgp1(i2+1,j)
+  print *,xsgp1(i1,  j),xsgp1(i2,  j)
+  print *,xsgp1(i1+1,j),xsgp1(i2-1,j)
+  print *,xsgp1(i1+2,j),xsgp1(i2-2,j)
+
+  print *,'replicate Y across seam on SG'
+  print *,ysgp1(i1-2,j),ysgp1(i2+2,j)
+  print *,ysgp1(i1-1,j),ysgp1(i2+1,j)
+  print *,ysgp1(i1,  j),ysgp1(i2,  j)
+  print *,ysgp1(i1+1,j),ysgp1(i2-1,j)
+  print *,ysgp1(i1+2,j),ysgp1(i2-2,j)
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! rotation angle on supergrid vertices
+! lonB: x(i-1,j-1) has same relationship to x(i,j) on SG as 
+!       geolonT(i,j) has to geolonBu(i,j) on the reduced grid
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+   pi_720deg = atan(1.0) / 180.0
+     len_lon = 360.0
+  do j=1,ny ; do i=1,nx-1
+    do n=1,2 ; do m=1,2
+      lonB(m,n) = modulo_around_point(xsgp1(I+m-2,J+n-2), xsgp1(i-1,j-1), len_lon)
+    enddo ; enddo
+
+    lon_scale    = cos(pi_720deg*(ysgp1(i-1,j-1) + ysgp1(i+1,j-1) + &
+                                  ysgp1(i-1,j+1) + ysgp1(i+1,j+1)) )
+    angq(i,j)    = atan2(lon_scale*((lonB(1,2) - lonB(2,1)) + (lonB(2,2) - lonB(1,1))), &
+                          ysgp1(i-1,j+1) + ysgp1(i+1,j+1) - &
+                          ysgp1(i-1,j-1) - ysgp1(i+1,j-1) )
   enddo ; enddo
+
+  !check  
+   j = ny
+  i1 = ipole(1); i2 = ipole(2)-(ipole(1)-i1)
+  print *,'angq along seam on SG'
+  print *,angq(i1-2,j),angq(i2+2,j)
+  print *,angq(i1-1,j),angq(i2+1,j)
+  print *,angq(i1,  j),angq(i2,  j)
+  print *,angq(i1+1,j),angq(i2-1,j)
+  print *,angq(i1+2,j),angq(i2-2,j)
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 ! fill cice grid variables
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
+  print *,2*nj
   do j = 1,nj
    do i = 1,ni
      i2 = 2*i ; j2 = 2*j
@@ -213,7 +298,6 @@ program generate_cice_fix_file
     !m->cm
       htn(i,j) = (dx(i2-1,j2) + dx(i2,j2))*100.0
       hte(i,j) = (dy(i2,j2-1) + dy(i2,j2))*100.0
-#ifdef debug
     !deg
       lonT(i,j) =     x(i2-1,j2-1)
      lonCu(i,j) =     x(i2,  j2-1)
@@ -224,7 +308,6 @@ program generate_cice_fix_file
      latCv(i,j) =     y(i2-1,j2  )
     !in rad already
     anglet(i,j) = -angq(i2-1,j2-1)
-#endif
    enddo
   enddo
 
@@ -270,7 +353,7 @@ program generate_cice_fix_file
   print *,htn(i1,  j),htn(i2,  j)
   print *,htn(i1+1,j),htn(i2-1,j)
   print *,htn(i1+2,j),htn(i2-2,j)
-#ifdef debug
+
   print *,'latCv across seam '
   print *,latCv(i1-2,j),latCv(i2+2,j)
   print *,latCv(i1-1,j),latCv(i2+1,j)
@@ -285,13 +368,13 @@ program generate_cice_fix_file
   print *,lonCv(i1+1,j),lonCv(i2-1,j)
   print *,lonCv(i1+2,j),lonCv(i2-2,j)
 
-  print *,'anglet across seam '
+  print *,'angleT across seam '
   print *,angleT(i1-2,j),angleT(i2+2,j)
   print *,angleT(i1-1,j),angleT(i2+1,j)
   print *,angleT(i1,  j),angleT(i2,  j)
   print *,angleT(i1+1,j),angleT(i2-1,j)
   print *,angleT(i1+2,j),angleT(i2-2,j)
-#endif
+
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 ! write out cice grid file
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -341,7 +424,7 @@ program generate_cice_fix_file
  
   status = nf90_inq_varid(ncid,    'kmt',        id)
   status = nf90_put_var(ncid,         id, int(wet4))
-#ifdef debug
+#ifdef debug_output
   status = nf90_inq_varid(ncid, 'anglet',     id)
   status = nf90_put_var(ncid,         id, anglet)
 
@@ -380,14 +463,14 @@ program generate_cice_fix_file
 ! against those values 
 ! could also check diagnostic ocean output if use correct MOM6 names
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  
+
   fname_out = '/scratch3/NCEPDEV/stmp1/Denise.Worthen/frzmlt_cold_geomfile/tmp/' &
             //'cpld_fv3_mom6_cice_cold_atm_flux/MOM6_OUTPUT/ocean_geometry.nc'
 
   status = nf90_open(fname_out, nf90_nowrite, ncid)
-  if(status .ne. 0)stop
   print *, 'reading MOM6 runtime geometry from ',trim(fname_out)
   print *, 'nf90_open = ',trim(nf90_strerror(status))
+  if(status .ne. 0)stop
   
   ! use kmt as a 'check mask' to eliminate known non-matching values
   ! to not report
@@ -424,7 +507,7 @@ program generate_cice_fix_file
   status = nf90_get_var(ncid,          id,  momvar)
   momvar = momvar*100.0
   call checkvals('hte',ni,nj,hte,momvar,wet4,kmt)
-#ifdef debug
+
   !geolat; centers, in degrees  
   kmt = int(wet4)
   status = nf90_inq_varid(ncid,  'geolat',      id)
@@ -436,10 +519,25 @@ program generate_cice_fix_file
   status = nf90_inq_varid(ncid,  'geolon',      id)
   status = nf90_get_var(ncid,          id,  momvar)
   call checkvals('lonT',ni,nj,lonT,momvar,wet4,kmt)
-#endif
   status = nf90_close(ncid)
 
 end program generate_cice_fix_file
+
+! -----------------------------------------------------------------------------
+!> Return the modulo value of x in an interval [xc-(Lx/2) xc+(Lx/2)]
+!! If Lx<=0, then it returns x without applying modulo arithmetic.
+function modulo_around_point(x, xc, Lx) result(x_mod)
+  real(kind=8), intent(in) :: x  !< Value to which to apply modulo arithmetic
+  real(kind=8), intent(in) :: xc !< Center of modulo range
+  real(kind=8), intent(in) :: Lx !< Modulo range width
+  real(kind=8) :: x_mod          !< x shifted by an integer multiple of Lx to be close to xc.
+
+  if (Lx > 0.0) then
+    x_mod = modulo(x - (xc - 0.5*Lx), Lx) + (xc - 0.5*Lx)
+  else
+    x_mod = x
+  endif
+end function modulo_around_point
 
 subroutine checkvals(vname,idim,jdim,cice,mom,wet,chkmask)
 
@@ -466,5 +564,5 @@ subroutine checkvals(vname,idim,jdim,cice,mom,wet,chkmask)
                                ' MOM at ijloc ',mom(ijloc(1),ijloc(2)), &
                                ' land mask at ijloc ',wet(ijloc(1),ijloc(2))
   endif
-  print * 
+  print *
 end subroutine checkvals

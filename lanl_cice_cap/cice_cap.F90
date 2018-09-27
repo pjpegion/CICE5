@@ -1052,8 +1052,8 @@ module cice_cap_mod
     enddo     !iblk
     deallocate(ssh)
     !!!!!!!!!!! test
-    ss_tltx = 0._ESMF_KIND_R8
-    ss_tlty = 0._ESMF_KIND_R8
+    !ss_tltx = 0._ESMF_KIND_R8
+    !ss_tlty = 0._ESMF_KIND_R8
     !!!!!!!!!!! test
 
     do iblk = 1,nblocks

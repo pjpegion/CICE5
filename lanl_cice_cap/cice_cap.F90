@@ -1046,10 +1046,6 @@ module cice_cap_mod
        enddo    !j
     enddo     !iblk
     deallocate(ssh)
-    !!!!!!!!!!! test
-    !ss_tltx = 0._ESMF_KIND_R8
-    !ss_tlty = 0._ESMF_KIND_R8
-    !!!!!!!!!!! test
 
     do iblk = 1,nblocks
        this_block = get_block(blocks_ice(iblk),iblk)
@@ -1137,7 +1133,9 @@ module cice_cap_mod
     call ESMF_LogWrite(info, ESMF_LOGMSG_INFO, rc=dbrc)
     enddo !iblk
     endif !HaloDebug
-
+ 
+    !TODO: check if these are required; move to ugrid does
+    ! a halo update; atm fields are needed only at centers
     call ice_HaloUpdate(   uocn, halo_info, field_loc_center, &
                         field_type_vector)
     call ice_HaloUpdate(   vocn, halo_info, field_loc_center, &
@@ -1421,7 +1419,6 @@ module cice_cap_mod
 ! Dump out all the cice internal fields to cross-examine with those connected with mediator
 ! This will help to determine roughly which fields can be hooked into cice
 
-   import_slice = import_slice+1
    call dumpCICEInternal(ice_grid_i, import_slice, "inst_zonal_wind_height10m", "will provide", strax)
    call dumpCICEInternal(ice_grid_i, import_slice, "inst_merid_wind_height10m", "will provide", stray)
    call dumpCICEInternal(ice_grid_i, import_slice, "inst_pres_height_surface" , "will provide", zlvl)
@@ -1451,7 +1448,6 @@ module cice_cap_mod
 
 !--------- export fields from Sea Ice -------------
 
-   export_slice = export_slice+1
    call dumpCICEInternal(ice_grid_i, export_slice, "ice_fraction"                     , "will provide", aice)
    !call dumpCICEInternal(ice_grid_i, export_slice, "inst_ice_vis_dir_albedo"         , "will provide", alvdr)
    !call dumpCICEInternal(ice_grid_i, export_slice, "inst_ice_ir_dir_albedo"          , "will provide", alidr)
@@ -2026,7 +2022,7 @@ module cice_cap_mod
     real(ESMF_KIND_R8), dimension(:,:), pointer  :: f2d
     integer                  :: i,j,rc
 
-    !if(.not. write_diagnostics) return ! remove this line to debug field connection
+    if(.not. write_diagnostics) return ! remove this line to debug field connection
 
     field = ESMF_FieldCreate(grid, ESMF_TYPEKIND_R8, &
       indexflag=ESMF_INDEX_DELOCAL, &

@@ -75,9 +75,23 @@ program generate_cice_fix_file
 !
 !            anglet(i,j) =    -pang(i+i0,  j+j0)   !radians
 !c           pang is from lon-lat to x-y, but anglet is the reverse
-!
+
 ! where anglet is the angle variable being written to the CICE grid file 
 ! and pang is HYCOM's own rotation angle. 
+!
+! Tripole Seam flip: ipL,ipR left,right poles on seam
+!
+! ipL-1     ipL    ipL+1       ipR-1     ipR    ipR+1
+!    x-------x-------x     |||    x-------x-------x 
+!
+! Fold over; ipL must align with ipR
+!  
+!  ipR+1     ipR    ipR-1
+!     x-------x-------x 
+!  ipL-1     ipL    ipL+1
+!     x-------x-------x 
+!
+!
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
   use netcdf

@@ -80,7 +80,7 @@ module cice_cap_mod
   logical :: profile_memory = .false.
   logical :: grid_attach_area = .false.
   ! local helper flag for halo debugging
-  logical :: HaloDebug = .true.
+  logical :: HaloDebug = .false.
   contains
   !-----------------------------------------------------------------------
   !------------------- CICE code starts here -----------------------
@@ -1042,11 +1042,6 @@ module cice_cap_mod
           else
             ss_tlty(i,j,iblk) = 0.0
           endif
-          ! rotate onto local basis vectors
-          !ue = ss_tltx   (i,j,iblk)
-          !vn = ss_tlty   (i,j,iblk)
-          !ss_tltx(i,j,iblk) =  ue*cos(ANGLET(i,j,iblk)) + vn*sin(ANGLET(i,j,iblk))
-          !ss_tlty(i,j,iblk) = -ue*sin(ANGLET(i,j,iblk)) + vn*cos(ANGLET(i,j,iblk))
        enddo    !i
        enddo    !j
     enddo     !iblk
@@ -1111,28 +1106,11 @@ module cice_cap_mod
          uatm   (i,j,iblk) = dataPtr_ubot  (i1,j1,iblk)
          vatm   (i,j,iblk) = dataPtr_vbot  (i1,j1,iblk)
          !wind   (i,j,iblk) = sqrt(dataPtr_ubot  (i1,j1,iblk)**2 + dataPtr_vbot  (i1,j1,iblk)**2)     ! wind speed
-          !uatm   (i,j,iblk) =  ue*cos(ANGLET(i,j,iblk)) + vn*sin(ANGLET(i,j,iblk))  ! wind u component
-          !vatm   (i,j,iblk) = -ue*sin(ANGLET(i,j,iblk)) + vn*cos(ANGLET(i,j,iblk))  ! wind v component
-          !wind   (i,j,iblk) = sqrt(dataPtr_ubot  (i1,j1,iblk)**2 + dataPtr_vbot  (i1,j1,iblk)**2)     ! wind speed
-
-          ! zonal sea surface slope
-          !sigma_r = 0.5*(dataPtr_sl(i1+1,j1+1,iblk)-dataPtr_sl(i1,j1+1,iblk)+ dataPtr_sl(i1+1,j1,iblk)-dataPtr_sl(i1,j1,iblk))/dxt(i,j,iblk)
-          !sigma_l = 0.5*(dataPtr_sl(i1,j1+1,iblk)-dataPtr_sl(i1-1,j1+1,iblk)+ dataPtr_sl(i1,j1,iblk)-dataPtr_sl(i1-1,j1,iblk))/dxt(i,j,iblk)
-          !sigma_c = 0.5*(sigma_r+sigma_l)
-          !if ( (sigma_r * sigma_l) .GT. 0.0 ) then
-          !  ss_tltx(i,j,iblk) = sign ( min( 2.*min(abs(sigma_l),abs(sigma_r)), abs(sigma_c) ), sigma_c )
-          !else
-          !  ss_tltx(i,j,iblk) = 0.0
-          !endif
-          ! meridional sea surface slope
-          !sigma_r = 0.5*(dataPtr_sl(i1+1,j1+1,iblk)-dataPtr_sl(i1+1,j1,iblk)+ dataPtr_sl(i1,j1+1,iblk)-dataPtr_sl(i1,j1,iblk))/dyt(i,j,iblk)
-          !sigma_l = 0.5*(dataPtr_sl(i1+1,j1,iblk)-dataPtr_sl(i1+1,j1-1,iblk)+ dataPtr_sl(i1,j1,iblk)-dataPtr_sl(i1,j1-1,iblk))/dyt(i,j,iblk)
-          !sigma_c = 0.5*(sigma_r+sigma_l)
-          !if ( (sigma_r * sigma_l) .GT. 0.0 ) then
-          !  ss_tlty(i,j,iblk) = sign ( min( 2.*min(abs(sigma_l),abs(sigma_r)), abs(sigma_c) ), sigma_c )
-          !else
-          !  ss_tlty(i,j,iblk) = 0.0
-          !endif
+         !uatm   (i,j,iblk) =  ue*cos(ANGLET(i,j,iblk)) + vn*sin(ANGLET(i,j,iblk))  ! wind u component
+         !vatm   (i,j,iblk) = -ue*sin(ANGLET(i,j,iblk)) + vn*cos(ANGLET(i,j,iblk))  ! wind v component
+         !wind   (i,j,iblk) = sqrt(dataPtr_ubot  (i1,j1,iblk)**2 + dataPtr_vbot  (i1,j1,iblk)**2)     ! wind speed
+        ss_tltx(i,j,iblk) = dataPtr_sssz(i1,j1,iblk)
+        ss_tlty(i,j,iblk) = dataPtr_sssm(i1,j1,iblk)
        enddo
        enddo
     enddo
@@ -1443,6 +1421,7 @@ module cice_cap_mod
 ! Dump out all the cice internal fields to cross-examine with those connected with mediator
 ! This will help to determine roughly which fields can be hooked into cice
 
+   import_slice = import_slice+1
    call dumpCICEInternal(ice_grid_i, import_slice, "inst_zonal_wind_height10m", "will provide", strax)
    call dumpCICEInternal(ice_grid_i, import_slice, "inst_merid_wind_height10m", "will provide", stray)
    call dumpCICEInternal(ice_grid_i, import_slice, "inst_pres_height_surface" , "will provide", zlvl)
@@ -1459,8 +1438,8 @@ module cice_cap_mod
    !call dumpCICEInternal(ice_grid_i, import_slice, "mean_fprec_rate", "will provide", fsnow)
    call dumpCICEInternal(ice_grid_i, import_slice, "ocn_current_zonal", "will provide", uocn)
    call dumpCICEInternal(ice_grid_i, import_slice, "ocn_current_merid", "will provide", vocn)
-   !call dumpCICEInternal(ice_grid_i, import_slice, "sea_surface_slope_zonal", "will provide", ss_tltx)
-   !call dumpCICEInternal(ice_grid_i, import_slice, "sea_surface_slope_merid", "will provide", ss_tlty)
+   call dumpCICEInternal(ice_grid_i, import_slice, "sea_surface_slope_zonal", "will provide", ss_tltx)
+   call dumpCICEInternal(ice_grid_i, import_slice, "sea_surface_slope_merid", "will provide", ss_tlty)
    call dumpCICEInternal(ice_grid_i, import_slice, "sea_surface_salinity", "will provide", sss)
    call dumpCICEInternal(ice_grid_i, import_slice, "sea_surface_temperature", "will provide", sst)
    !call dumpCICEInternal(ice_grid_i, import_slice, "freezing_melting_potential", "will provide", frzmlt)
@@ -1472,6 +1451,7 @@ module cice_cap_mod
 
 !--------- export fields from Sea Ice -------------
 
+   export_slice = export_slice+1
    call dumpCICEInternal(ice_grid_i, export_slice, "ice_fraction"                     , "will provide", aice)
    !call dumpCICEInternal(ice_grid_i, export_slice, "inst_ice_vis_dir_albedo"         , "will provide", alvdr)
    !call dumpCICEInternal(ice_grid_i, export_slice, "inst_ice_ir_dir_albedo"          , "will provide", alidr)
@@ -2046,7 +2026,7 @@ module cice_cap_mod
     real(ESMF_KIND_R8), dimension(:,:), pointer  :: f2d
     integer                  :: i,j,rc
 
-    if(.not. write_diagnostics) return ! remove this line to debug field connection
+    !if(.not. write_diagnostics) return ! remove this line to debug field connection
 
     field = ESMF_FieldCreate(grid, ESMF_TYPEKIND_R8, &
       indexflag=ESMF_INDEX_DELOCAL, &

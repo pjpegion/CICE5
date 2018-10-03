@@ -586,6 +586,9 @@ module cice_cap_mod
 !    dataPtr_ifrac = -99._ESMF_KIND_R8
 !    dataPtr_itemp = -99._ESMF_KIND_R8
 
+    write(tmpstr,'(a,3i8)') trim(subname)//' nx_block, ny_block, nblocks = ',nx_block,ny_block,nblocks
+    call ESMF_LogWrite(trim(tmpstr), ESMF_LOGMSG_INFO, rc=dbrc)
+
     write(info,*) trim(subname),' --- initialization phase 2 completed --- '
     call ESMF_LogWrite(info, ESMF_LOGMSG_INFO, line=__LINE__, file=__FILE__, rc=dbrc)
 
@@ -702,8 +705,6 @@ module cice_cap_mod
     real(ESMF_KIND_R8), pointer :: dataPtr_strairyT(:,:,:)
     real(ESMF_KIND_R8), pointer :: dataPtr_strocnxT(:,:,:)
     real(ESMF_KIND_R8), pointer :: dataPtr_strocnyT(:,:,:)
-!    real(ESMF_KIND_R8), pointer :: dataPtr_strocni(:,:,:)
-!    real(ESMF_KIND_R8), pointer :: dataPtr_strocnj(:,:,:)
     real(ESMF_KIND_R8), pointer :: dataPtr_fswthru(:,:,:)
     real(ESMF_KIND_R8), pointer :: dataPtr_fswthruvdr(:,:,:)
     real(ESMF_KIND_R8), pointer :: dataPtr_fswthruvdf(:,:,:)
@@ -920,9 +921,9 @@ module cice_cap_mod
     call State_getFldPtr(importState,'air_density_height_lowest',dataPtr_rhoabot,rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU,line=__LINE__,file=__FILE__)) return
 
-    write(tmpstr,'(a,3i8)') trim(subname)//' nx_block, ny_block, nblocks = ',nx_block,ny_block,nblocks
-    call ESMF_LogWrite(trim(tmpstr), ESMF_LOGMSG_INFO, rc=dbrc)
-
+#if (1 == 0)
+! this calculation of slope produces anomalies along the tripole seam
+! use the MOM6 import fields of slope instead
     allocate(ssh(1:nx_block,1:ny_block,1:nblocks))
     ssh = 0._ESMF_KIND_R8
 
@@ -963,18 +964,6 @@ module cice_cap_mod
      real(ssh((ihi-ilo)+1,jhi-1,iblk),4),&
      real(ssh((ihi-ilo)+1,jhi,  iblk),4),&
      real(ssh((ihi-ilo)+1,jhi+1,iblk),4)
-    call ESMF_LogWrite(info, ESMF_LOGMSG_INFO, rc=dbrc)
-
-    write(info, *) trim(subname)//' before halo update ANGLET i=1,2,3:', &
-     real(ANGLET(1,(jhi-jlo)+1,iblk),4),&
-     real(ANGLET(2,(jhi-jlo)+1,iblk),4),&
-     real(ANGLET(3,(jhi-jlo)+1,iblk),4)
-    call ESMF_LogWrite(info, ESMF_LOGMSG_INFO, rc=dbrc)
-
-    write(info, *) trim(subname)//' before halo update ANGLET j=jhi-1,jhi,jhi+1:', &
-     real(ANGLET((ihi-ilo)+1,jhi-1,iblk),4),&
-     real(ANGLET((ihi-ilo)+1,jhi,  iblk),4),&
-     real(ANGLET((ihi-ilo)+1,jhi+1,iblk),4)
     call ESMF_LogWrite(info, ESMF_LOGMSG_INFO, rc=dbrc)
     enddo !iblk
     endif !HaloDebug
@@ -1046,6 +1035,7 @@ module cice_cap_mod
        enddo    !j
     enddo     !iblk
     deallocate(ssh)
+#endif
 
     do iblk = 1,nblocks
        this_block = get_block(blocks_ice(iblk),iblk)
@@ -1110,67 +1100,6 @@ module cice_cap_mod
        enddo
        enddo
     enddo
-
-    if(HaloDebug)then
-    ! check halos
-    do iblk = 1,nblocks
-       this_block = get_block(blocks_ice(iblk),iblk)
-       ilo = this_block%ilo
-       ihi = this_block%ihi
-       jlo = this_block%jlo
-       jhi = this_block%jhi
-
-    write(info, *) trim(subname)//' before halo update vocn i=1,2,3:', &
-     real(vocn(1,(jhi-jlo)+1,iblk),4),&
-     real(vocn(2,(jhi-jlo)+1,iblk),4),&
-     real(vocn(3,(jhi-jlo)+1,iblk),4)
-    call ESMF_LogWrite(info, ESMF_LOGMSG_INFO, rc=dbrc)
-
-    write(info, *) trim(subname)//' before halo update vocn j=jhi-1,jhi,jhi+1:', &
-     real(vocn((ihi-ilo)+1,jhi-1,iblk),4),&
-     real(vocn((ihi-ilo)+1,jhi,  iblk),4),&
-     real(vocn((ihi-ilo)+1,jhi+1,iblk),4)
-    call ESMF_LogWrite(info, ESMF_LOGMSG_INFO, rc=dbrc)
-    enddo !iblk
-    endif !HaloDebug
- 
-    !TODO: check if these are required; move to ugrid does
-    ! a halo update; atm fields are needed only at centers
-    call ice_HaloUpdate(   uocn, halo_info, field_loc_center, &
-                        field_type_vector)
-    call ice_HaloUpdate(   vocn, halo_info, field_loc_center, &
-                        field_type_vector)
-    call ice_HaloUpdate(   uatm, halo_info, field_loc_center, &
-                        field_type_vector)
-    call ice_HaloUpdate(   vatm, halo_info, field_loc_center, &
-                        field_type_vector)
-    call ice_HaloUpdate(ss_tltx, halo_info, field_loc_center, &
-                        field_type_vector)
-    call ice_HaloUpdate(ss_tlty, halo_info, field_loc_center, &
-                        field_type_vector)
-
-    if(HaloDebug)then
-    ! check halos
-    do iblk = 1,nblocks
-       this_block = get_block(blocks_ice(iblk),iblk)
-       ilo = this_block%ilo
-       ihi = this_block%ihi
-       jlo = this_block%jlo
-       jhi = this_block%jhi
-
-    write(info, *) trim(subname)//' after halo update vocn i=1,2,3:', &
-     real(vocn(1,(jhi-jlo)+1,iblk),4),&
-     real(vocn(2,(jhi-jlo)+1,iblk),4),&
-     real(vocn(3,(jhi-jlo)+1,iblk),4)
-    call ESMF_LogWrite(info, ESMF_LOGMSG_INFO, rc=dbrc)
-
-    write(info, *) trim(subname)//' after halo update vocn j=jhi-1,jhi,jhi+1:', &
-     real(vocn((ihi-ilo)+1,jhi-1,iblk),4),&
-     real(vocn((ihi-ilo)+1,jhi,  iblk),4),&
-     real(vocn((ihi-ilo)+1,jhi+1,iblk),4)
-    call ESMF_LogWrite(info, ESMF_LOGMSG_INFO, rc=dbrc)
-    enddo !iblk
-    endif !HaloDebug
 
     do iblk = 1, nblocks
 
@@ -1243,10 +1172,6 @@ module cice_cap_mod
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU,line=__LINE__,file=__FILE__)) return
     call State_getFldPtr(exportState,'stress_on_ocn_ice_merid',dataPtr_strocnyT,rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU,line=__LINE__,file=__FILE__)) return
-!    call State_getFldPtr(exportState,'stress_on_ocn_ice_idir',dataPtr_strocni,rc=rc)
-!    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU,line=__LINE__,file=__FILE__)) return
-!    call State_getFldPtr(exportState,'stress_on_ocn_ice_jdir',dataPtr_strocnj,rc=rc)
-!    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU,line=__LINE__,file=__FILE__)) return
     call State_getFldPtr(exportState,'net_heat_flx_to_ocn',dataPtr_fhocn,rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU,line=__LINE__,file=__FILE__)) return
     call State_getFldPtr(exportState,'mean_fresh_water_to_ocean_rate',dataPtr_fresh,rc=rc)
@@ -1334,8 +1259,6 @@ module cice_cap_mod
           vj = -strocnyT(i,j,iblk)
           dataPtr_strocnxT(i1,j1,iblk) = ui*cos(ANGLET(i,j,iblk)) - vj*sin(ANGLET(i,j,iblk))  ! ice ocean stress
           dataPtr_strocnyT(i1,j1,iblk) = ui*sin(ANGLET(i,j,iblk)) + vj*cos(ANGLET(i,j,iblk))  ! ice ocean stress
-!          dataPtr_strocni(i1,j1,iblk) = ui
-!          dataPtr_strocnj(i1,j1,iblk) = vj
 !!          write(tmpstr,'(a,3i6,2x,g17.7)') trim(subname)//' aice = ',i,j,iblk,dataPtr_ifrac(i,j,iblk)
 !!          call ESMF_LogWrite(trim(tmpstr), ESMF_LOGMSG_INFO, rc=dbrc)
        enddo

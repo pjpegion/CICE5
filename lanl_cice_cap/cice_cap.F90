@@ -680,8 +680,6 @@ module cice_cap_mod
     real(ESMF_KIND_R8), pointer :: dataPtr_sssm(:,:,:)
     real(ESMF_KIND_R8), pointer :: dataPtr_ocncz(:,:,:)
     real(ESMF_KIND_R8), pointer :: dataPtr_ocncm(:,:,:)
-!    real(ESMF_KIND_R8), pointer :: dataPtr_ocnci(:,:,:)
-!    real(ESMF_KIND_R8), pointer :: dataPtr_ocncj(:,:,:)
     real(ESMF_KIND_R8), pointer :: dataPtr_fmpot(:,:,:)
     real(ESMF_KIND_R8), pointer :: dataPtr_mld(:,:,:)
     real(ESMF_KIND_R8), pointer :: dataPtr_mzmf(:,:,:)
@@ -904,10 +902,6 @@ module cice_cap_mod
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU,line=__LINE__,file=__FILE__)) return
     call State_getFldPtr(importState,'ocn_current_merid',dataPtr_ocncm,rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU,line=__LINE__,file=__FILE__)) return
-!    call State_getFldPtr(importState,'ocn_current_idir',dataPtr_ocnci,rc=rc)
-!    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU,line=__LINE__,file=__FILE__)) return
-!    call State_getFldPtr(importState,'ocn_current_jdir',dataPtr_ocncj,rc=rc)
-!    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU,line=__LINE__,file=__FILE__)) return
     call State_getFldPtr(importState,'freezing_melting_potential',dataPtr_fmpot,rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU,line=__LINE__,file=__FILE__)) return
     call State_getFldPtr(importState,'mixed_layer_depth',dataPtr_mld,rc=rc)
@@ -1779,8 +1773,6 @@ module cice_cap_mod
     call fld_list_add(fldsToIce_num, fldsToIce, "sea_surface_slope_merid"  , "will provide")
     call fld_list_add(fldsToIce_num, fldsToIce, "ocn_current_zonal"        , "will provide")
     call fld_list_add(fldsToIce_num, fldsToIce, "ocn_current_merid"        , "will provide")
-!    call fld_list_add(fldsToIce_num, fldsToIce, "ocn_current_idir"         , "will provide")
-!    call fld_list_add(fldsToIce_num, fldsToIce, "ocn_current_jdir"         , "will provide")
     call fld_list_add(fldsToIce_num, fldsToIce, "freezing_melting_potential", "will provide")
     call fld_list_add(fldsToIce_num, fldsToIce, "mixed_layer_depth"        , "will provide")
     call fld_list_add(fldsToIce_num, fldsToIce, "mean_zonal_moment_flx", "will provide")
@@ -1846,8 +1838,6 @@ module cice_cap_mod
     call fld_list_add(fldsFrIce_num, fldsFrIce, "stress_on_air_ice_merid"         , "will provide")
     call fld_list_add(fldsFrIce_num, fldsFrIce, "stress_on_ocn_ice_zonal"         , "will provide")
     call fld_list_add(fldsFrIce_num, fldsFrIce, "stress_on_ocn_ice_merid"         , "will provide")
-!    call fld_list_add(fldsFrIce_num, fldsFrIce, "stress_on_ocn_ice_idir"          , "will provide")
-!    call fld_list_add(fldsFrIce_num, fldsFrIce, "stress_on_ocn_ice_jdir"          , "will provide")
     call fld_list_add(fldsFrIce_num, fldsFrIce, "mean_sw_pen_to_ocn"              , "will provide")
     call fld_list_add(fldsFrIce_num, fldsFrIce, "mean_net_sw_vis_dir_flx"         , "will provide")
     call fld_list_add(fldsFrIce_num, fldsFrIce, "mean_net_sw_vis_dif_flx"         , "will provide")

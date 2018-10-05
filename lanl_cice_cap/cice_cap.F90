@@ -12,7 +12,10 @@
 !   be computed in ESMF.
 ! 9/24/18: Denise Worthen (denise.worthen@noaa.gov)
 ! * corrected calculation of sea surface slope gradients across PET boundaries; corrected vector halo
-!   filling for move to CICE U-grid 
+!   filling for move to CICE U-grid
+! 10/3/18: Denise Worthen (denise.worthen@noaa.gov)
+! * calculation of slope of sea surface set non-op; slopes are obtained by import of fields from the
+!   ocean component
 module cice_cap_mod
 
   use ice_blocks, only: nx_block, ny_block, nblocks_tot, block, get_block, &

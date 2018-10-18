@@ -64,8 +64,8 @@ begin
 ; loop over files
 ;************************************************
 
-   ii = 0
-   ;do ii = 0,nfiles-1
+   ;ii = 0
+   do ii = 0,nfiles-1
     ; create output file name
     outfile = icefilelist(ii)
     ; find the index where the actual filename begins
@@ -78,10 +78,10 @@ begin
     filedimdef(df,"time",-1,True)
     print("regridded files will be written to "+outfile)
 
-    aice_h = icef[ii]->aice_h(ii,:,:)
-      hi_h = icef[ii]->hi_h(ii,:,:)
-    uvel_h = icef[ii]->uvel_h(ii,:,:)
-    vvel_h = icef[ii]->vvel_h(ii,:,:)
+    aice_h = icef[ii]->aice_h(0,:,:)
+      hi_h = icef[ii]->hi_h(0,:,:)
+    uvel_h = icef[ii]->uvel_h(0,:,:)
+    vvel_h = icef[ii]->vvel_h(0,:,:)
     ;printVarSummary(aice_h)
     ; delete the attributes which are no longer valid after regridding
     delete_VarAtts(aice_h,(/"coordinates", "cell_measures"/))
@@ -120,8 +120,9 @@ begin
      df->hi_h = ESMF_regrid_with_weights(hi_h, wgts, True)
      df->uvel_h  = ESMF_regrid_with_weights(   uvel_h, wgts, True)
      df->vvel_h  = ESMF_regrid_with_weights(   vvel_h, wgts, True)
+     delete(df)
 
-   ;end do ; nfiles
+   end do ; nfiles
 
 
 exit

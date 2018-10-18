@@ -1,0 +1,14 @@
+This script shows an initial attempt to post-process the CICE5 history files from
+tripole to rectilinear grids. It currently does not give correct results because
+I am pointing to an old remap file.  
+
+It can be run by just giving the directory where the history files reside, for
+example: 
+
+ncl < postice.ncl 'dirname="/scratch3/NCEPDEV/stmp1/Denise.Worthen/Benchtest/"'
+
+The script will loop over all files in that directory starting with the name "ice".
+The files will then be written to a subdirectory of dirname (called in this case
+"025") to indicate they are regridded to 1/4 degree; "025" is also appended to the
+filename
+

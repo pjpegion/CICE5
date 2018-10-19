@@ -59,7 +59,7 @@ begin
     tarea = icef[0]->tarea
     uarea = icef[0]->uarea
   ; in radians, on t-grid
-   rotang = icef[0]->ANGLE
+   rotang = icef[0]->ANGLET
 
 ;************************************************
 ; loop over files

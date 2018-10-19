@@ -21,8 +21,9 @@ begin
 ;************************************************
 
    nemsrc  = "/scratch4/NCEPDEV/ocean/save/Denise.Worthen/NEMS_INPUT0.1/"
-   wgtsrc  = nemsrc+"regrids/"
-   wgtfile = "mom6_rect024.nc"
+
+   wgtsrc  = "$WORK/EMC_CICE/tools/post/"
+   wgtfile = "cice5_tripole_tgrid_rect024.nc"
       wgts = wgtsrc + wgtfile
 
 ;************************************************
@@ -36,7 +37,7 @@ begin
      dstlonname = "lon"
     dstmaskname = "wet"
 
-      gridfile = addfile(wgtsrc+dstgrid,"r")
+      gridfile = addfile(nemsrc+"regrids/"+dstgrid,"r")
           dstlon = gridfile->$dstlonname$
           dstlat = gridfile->$dstlatname$
          dstmask = gridfile->$dstmaskname$
@@ -65,15 +66,18 @@ begin
 ;************************************************
 
    ;ii = 0
-   do ii = 0,nfiles-1
+   ;do ii = 0,nfiles-1
+   do ii = 0,1
     ; create output file name
     outfile = icefilelist(ii)
     ; find the index where the actual filename begins
      indstr = str_index_of_substr(outfile, "/", -1)
     ; insert a sub-directory name
-    outfile = str_insert(outfile,"025/",indstr+1)
+    outfile = str_insert(outfile,"024/",indstr+1)
     ; insert a string indicating regridding resolution
-    outfile = str_insert(outfile,"025.",-3)
+    outfile = str_insert(outfile,"024.",-3)
+    system("/bin/rm -f "+outfile)
+
          df = addfile(outfile,"c")
     filedimdef(df,"time",-1,True)
     print("regridded files will be written to "+outfile)

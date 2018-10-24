@@ -1,4 +1,4 @@
-;************************************************
+;***********************************************
 ; These files are loaded by default in NCL V6.2.0 and newer
 ; load "$NCARG_ROOT/lib/ncarg/nclscripts/csm/gsn_code.ncl"
 ; load "$NCARG_ROOT/lib/ncarg/nclscripts/csm/gsn_csm.ncl" 
@@ -7,11 +7,18 @@
   load "$NCARG_ROOT/lib/ncarg/nclscripts/contrib/cd_inv_string.ncl"
 
   load "levscmapCICE.ncl"
+  load "unstaggerCICE5.ncl"
+
 ;************************************************
- 
+
+  ; work well for whole polar section
+   vthn = 0.012
+  ; plotted in cm/s
   if(hemi .eq. "NH")then
+      vmag = 50.00
     minlat = 66.0
   else
+      vmag = 100.00
     maxlat = -50.0
   end if
 
@@ -22,9 +29,11 @@
    ulatname="ULAT"
    ulonname="ULON"
 
-  ; make faster for debugging
-  ; iskp = 3
-  ; jskp = 3
+    varname="icespd"
+      uname="uvel_h"
+      vname="vvel_h"
+
+  ; make faster for debugging; unstaggering faulty though!
    iskp = 1
    jskp = 1
 
@@ -40,8 +49,16 @@ begin
    icefilelist = systemfunc("ls "+dirname+"ice2*.nc")
           icef = addfiles(icefilelist,"r")
         ntimes = dimsizes(icefilelist)
-    ;print("ntimes = "+ntimes)
+    print("ntimes = "+ntimes)
     ;print(icefilelist)
+
+    ;do nt = 0,ntimes-1,4
+    ;   i1 = nt
+    ;   i2 = i1+3
+    ; print(i1+"  "+icefilelist(i1))
+    ; print(i2+"  "+icefilelist(i2))
+    ; print("  ")
+    ;end do
 
     ; get a string index
           i1 = str_index_of_substr(icefilelist(0), ".nc", 0)
@@ -60,7 +77,6 @@ begin
      timeUnits = icef[0]->time@units
   timeCalendar = icef[0]->time@calendar
 
-      nvars = dimsizes(varnames)
     runname = "benchmark"
    wkstitle = runname
 
@@ -78,15 +94,17 @@ begin
 ; define the map
 ;************************************************
 
-  wkstype="png"
+   wkstype="png"
   wkstype@wkWidth=800
   wkstype@wkHeight=800
   wks   = gsn_open_wks (wkstype,wkstitle)
 
-  npanels = dimsizes(varnames)
+  ;drawNDCGrid(wks)
+
+  npanels = 1
   ; maybe not all used
-    ncols = 2
-    nrows = 2
+    ncols = 1
+    nrows = 1
 
      plot = new(npanels,graphic)
       dum = new(npanels,graphic)
@@ -102,6 +120,15 @@ begin
   res@cnFillOn           = True                  ; color fill
   res@cnLinesOn          = False                 ; no contour lines
   res@cnLineLabelsOn     = False                 ; no contour lines
+
+  res@gsnScalarContour  = True                  ; vectors over scalars
+
+  res@vcRefMagnitudeF       = vmag              ; vec magnitude
+  res@vcRefLengthF          = 0.10              ; size of ref vector
+  res@vcMinDistanceF        = vthn              ; thins arrows near pole
+  res@vcGlyphStyle          = "CurlyVector"
+  res@vcRefAnnoOrthogonalPosF = 0.05
+  res@vcLineArrowThicknessF = 1.20
 
   res@gsnPolar   =  hemi                         ; specify the hemisphere
   if(hemi .eq. "NH")then
@@ -150,20 +177,50 @@ begin
   ;do nt = 0,12-1,4
        i1 = nt
        i2 = i1+3
-    do nv = 0,nvars-1
-         varname = varnames(nv)+"_h"
     ;average 4 files to make daily mean
+            uvar = dim_avg_n_Wrap(icef[:]->$uname$(i1:i2,::jskp,::iskp),0)
+            vvar = dim_avg_n_Wrap(icef[:]->$vname$(i1:i2,::jskp,::iskp),0)
+    ; in cm/s
+            uvar = 100.0*uvar
+            vvar = 100.0*vvar
+    ; unstagger
+            uvar = where(ismissing(uvar),0.0,uvar)
+            vvar = where(ismissing(vvar),0.0,vvar)
+              ut = unstaggerCICE5(uvar,uarea,tarea,hemi)
+              vt = unstaggerCICE5(vvar,uarea,tarea,hemi)
+        ut@lon2d = icef[0]->$tlonname$(::jskp,::iskp)*rfactor
+        ut@lat2d = icef[0]->$tlatname$(::jskp,::iskp)*rfactor
+        vt@lon2d = icef[0]->$tlonname$(::jskp,::iskp)*rfactor
+        vt@lat2d = icef[0]->$tlatname$(::jskp,::iskp)*rfactor
+  ; copy metadata
+            urot = ut
+            vrot = vt
+            urot = cos(rotang)*ut - sin(rotang)*vt
+            vrot = sin(rotang)*ut + cos(rotang)*vt
+          if(hemi .eq. "NH")then
+            urot = where(urot@lat2d .ge. minlat, urot, uvar@_FillValue)
+            vrot = where(vrot@lat2d .ge. minlat, vrot, vvar@_FillValue)
+          else
+            urot = where(urot@lat2d .le. maxlat, urot, uvar@_FillValue)
+            vrot = where(vrot@lat2d .le. maxlat, vrot, vvar@_FillValue)
+          end if 
+
+   ; make the ice spped
+   if(varname .eq. "icespd")then
+          icevar = (urot^2 + vrot^2)^0.5
+    icevar@units = "cm/s"
+    icevar@long_name = "Mean ice speed"
+    labelstring = icevar@long_name+" ("+icevar@units+") " 
+   else
           icevar = dim_avg_n_Wrap(icef[:]->$varname$(i1:i2,::jskp,::iskp),0)
+     labelstring = icevar@long_name+" ("+icevar@units+")  "+"["+varname+"]"
+   end if
     icevar@lon2d = icef[0]->$tlonname$(::jskp,::iskp)*rfactor
     icevar@lat2d = icef[0]->$tlatname$(::jskp,::iskp)*rfactor
-     labelstring = icevar@long_name+" ("+icevar@units+")  "+"["+varname+"]"
     icevar@units = ""
     icevar@long_name = ""
-    ;print("nv = "+nv+"  "+labelstring)
-    ;printVarSummary(icevar)
 
    ; array contour levels for variables
-       varname = varnames(nv)
        pltlevs = new((/3/),float)
        freturn = levscmapCICE(varname,hemi)
     pltlevs(:) = freturn[0]
@@ -179,18 +236,18 @@ begin
      res@cnMaxLevelValF       = pltlevs(1)       ; set the maximum contour level
      res@cnLevelSpacingF      = pltlevs(2)       ; set the interval between contours
     end if
+     res@cnFillPalette        = colormap
 
      res@gsnLeftString  = labelstring
-     res@gsnLeftStringFontHeightF = 0.025
+     res@gsnLeftStringFontHeightF = 0.015
 
-    plot(nv) = gsn_csm_contour_map_polar(wks,icevar,res)    ; create the plot
-     dum(nv) = gsn_add_polyline(wks,plot(nv),(/lon1, lon2/) , (/lat1, lat2/) ,pres)
+    plot(0) = gsn_csm_vector_scalar_map_polar(wks,urot,vrot,icevar,res)    ; create the plot
+     dum(0) = gsn_add_polyline(wks,plot(0),(/lon1, lon2/) , (/lat1, lat2/) ,pres)
 
      if(varname .eq. "aice_h" .or. varname .eq. "aice")
       delete(res@cnLevels)
       delete(res@lbLabelStrings)
      end if
-    end do
     resP@gsnPanelMainString = cd_string(times(nt),"%Y%N%D")
     gsn_panel(wks,plot,(/nrows,ncols/),resP)
     frame(wks)

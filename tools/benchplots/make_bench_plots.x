@@ -5,12 +5,21 @@ set dirname="/scratch4/NCEPDEV/nems/noscrub/Bin.Li/benchmark_test/$CDATE/COMFV3/
 
 set hemi="NH"
 set outname="ice."$hemi
-ncl dirname=\"{$dirname}\"  'varnames = (/"aice", "hi", "hs", "albsni"/)' hemi=\"{$hemi}\" outname=\"{$outname}\" benchplots_scalar.ncl
-set outname="melt.pond."$hemi
-ncl dirname=\"{$dirname}\"  'varnames = (/"meltt", "meltb", "apond", "hpond"/)' hemi=\"{$hemi}\" outname=\"{$outname}\" benchplots_scalar.ncl
+#ncl dirname=\"{$dirname}\"  'varnames = (/"aice", "hi", "hs", "albsni"/)' hemi=\"{$hemi}\" outname=\"{$outname}\" benchplots_scalar.ncl
 
+#set outname="melt.pond."$hemi
+#ncl dirname=\"{$dirname}\"  'varnames = (/"meltt", "meltb", "apond", "hpond"/)' hemi=\"{$hemi}\" outname=\"{$outname}\" benchplots_scalar.ncl
+
+set outname="icemotion."$hemi
+ncl dirname=\"{$dirname}\"  hemi=\"{$hemi}\" outname=\"{$outname}\" benchplots_vectors.ncl
+
+# do the southern hemisphere
 set hemi="SH"
-set outname="ice."$hemi
-ncl dirname=\"{$dirname}\"  'varnames = (/"aice", "hi", "hs", "albsni"/)' hemi=\"{$hemi}\" outname=\"{$outname}\" benchplots_scalar.ncl
-set outname="melt.pond."$hemi
-ncl dirname=\"{$dirname}\"  'varnames = (/"meltt", "meltb", "apond", "hpond"/)' hemi=\"{$hemi}\" outname=\"{$outname}\" benchplots_scalar.ncl
+#set outname="ice."$hemi
+#ncl dirname=\"{$dirname}\"  'varnames = (/"aice", "hi", "hs", "albsni"/)' hemi=\"{$hemi}\" outname=\"{$outname}\" benchplots_scalar.ncl
+
+#set outname="melt.pond."$hemi
+#ncl dirname=\"{$dirname}\"  'varnames = (/"meltt", "meltb", "apond", "hpond"/)' hemi=\"{$hemi}\" outname=\"{$outname}\" benchplots_scalar.ncl
+
+set outname="icemotion."$hemi
+ncl dirname=\"{$dirname}\"  hemi=\"{$hemi}\" outname=\"{$outname}\" benchplots_vectors.ncl

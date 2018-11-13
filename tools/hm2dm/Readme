@@ -1,0 +1,4 @@
+Creates a script to make daily means from hourly mean output
+Use: python make_fv3m6c5_h2d.py>hr2dm.x
+chmod +x hr2dm
+./hr2dm

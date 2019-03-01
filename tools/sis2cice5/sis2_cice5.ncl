@@ -37,7 +37,7 @@ saltmax = 3.2d0
 
 ; for testing, specify locations of SIS2 restart file and CICE5 grid file
 ; this script will write the new CICE5 restart into the sis2src directory
-sis2src = "/scratch3/NCEPDEV/stmp1/Denise.Worthen/HYBGOD/IC/"
+sis2src = "/scratch3/NCEPDEV/stmp1/Denise.Worthen/"
 cice5src = "/scratch4/NCEPDEV/nems/noscrub/emc.nemspara/RT/FV3-MOM6-CICE5/update-20190219/CICE/"
 
 ; specify 1/4 degree tripole resolution; both SIS2 and CICE5 use the same
@@ -46,7 +46,8 @@ ni = 1440
 nj = 1080
 
 ; specify the date of the restart being created 
-cdate="2016100300"
+;cdate="2011040100"
+cdate="2011090100"
 
 ; specify the name of the SIS2 restart file
 finname="ice_model.res_"+cdate+".nc"
@@ -109,9 +110,8 @@ coszen = fin->coszen(0,:,:)
  swidf = fin->flux_sw_nir_dif(0,:,:)
 
 ; these variables depend on categories, not including open water
-; SIS2 is in kg/m2 so convert to m 
- vicen = fin->h_ice(0,:,:,:)/rhoi
- vsnon = fin->h_snow(0,:,:,:)/rhos
+ vicen = fin->h_ice(0,:,:,:)
+ vsnon = fin->h_snow(0,:,:,:)
 ; T_skin in degC
  Tsfcn = fin->T_skin(0,:,:,:)
 ; snow enthalpy, only 1 snow layer for both SIS2 and CICE5
@@ -140,6 +140,10 @@ do k = 0,ncat-1
  end do
 end do
 
+; get the right units on vicen and vsnon (m)
+vicen = aicen*vicen/rhoi
+vsnon = aicen*vsnon/rhos
+
 ; a reasonable salinity profile
 salinz = new((/nilyr2/),double)
 do l = 0,nilyr2-1
@@ -163,9 +167,9 @@ do l = 0,nilyr2-1
   end do
 end do
 
-do l = 0,nilyr2-1
-  Tin(l,:,:,:) = where(Tin(l,:,:,:) .gt. Tmltz(l), Tmltz(l), Tin(l,:,:,:))
-end do
+;do l = 0,nilyr2-1
+;  Tin(l,:,:,:) = where(Tin(l,:,:,:) .gt. Tmltz(l), Tmltz(l), Tin(l,:,:,:))
+;end do
 
 ;************************************************
 ; SIS2 restart has missing values but no attribute for it
@@ -197,6 +201,13 @@ end do
   
 ; remove uvel missing value
   uvel = where(ismissing(uvel), 0.0d0,   uvel)
+
+; remove non-ice points
+  uvel = where(dim_sum_n(aicen,0) .eq. 0.0d0, 0.0d0,  uvel)
+  vvel = where(dim_sum_n(aicen,0) .eq. 0.0d0, 0.0d0,  vvel)
+ vicen = where(dim_sum_n(aicen,0) .eq. 0.0d0, 0.0d0, vicen)
+ vsnon = where(dim_sum_n(aicen,0) .eq. 0.0d0, 0.0d0, vsnon)
+ Tsfcn = where(dim_sum_n(aicen,0) .eq. 0.0d0, 0.0d0, Tsfcn)
 
 ;************************************************
 ; Initialize these CICE5 variables to zero

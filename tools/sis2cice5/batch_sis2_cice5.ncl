@@ -21,6 +21,9 @@
 ; CICE5 uses (kcatbound=0): 0, 0.64, 1.39, 2.47, 4.57
 ; the script associates the thickness categories between SIS2 and CICE5 1:1
 ; ignoring the differences in category thickness definitions
+;
+; this code is a batch job version of the converstion which will
+; list all files and loop over each
 ;************************************************
 begin
 
@@ -35,9 +38,12 @@ saltmax = 3.2d0
  cp_ocn = 4218.d0
  Lfresh = 3.34d5
 
-; for testing, specify locations of SIS2 restart file and CICE5 grid file
+;************************************************
+; set up for directory names for batch
+;************************************************
+ 
 ; this script will write the new CICE5 restart into the sis2src directory
-sis2src = "/scratch3/NCEPDEV/stmp1/Denise.Worthen/"
+sis2src = "/scratch3/NCEPDEV/stmp1/Denise.Worthen/TESTDA/"
 cice5src = "/scratch4/NCEPDEV/nems/noscrub/emc.nemspara/RT/FV3-MOM6-CICE5/update-20190219/CICE/"
 
 ; specify 1/4 degree tripole resolution; both SIS2 and CICE5 use the same
@@ -53,151 +59,161 @@ print("CICE5 mask file used : "+cice5src+ftmaskname)
 kmt = fmask->kmt
 iceumask = todouble(kmt)
 
-; specify the date of the restart being created 
-;cdate="2011040100"
-cdate="2011090100"
+; list the dates available for conversion
+dates = systemfunc("ls "+sis2src)
+ndates = dimsizes(dates)
+;print(dates)
 
-; specify the name of the SIS2 restart file
-finname="ice_model.res_"+cdate+".nc"
-fin  = addfile(sis2src+finname,"r")
-print("SIS2 file being converted : "+sis2src+finname)
+;************************************************
+; loop over all dates in sis2src which contain
+; a SIS2 restartfile
+;************************************************
 
-; specify the name of the new CICE5 restart file
-foutname="cice5_model_0.25.res_"+cdate+".nc"
-; get output file ready
-system("/bin/rm -f "+sis2src+foutname)
-fout = addfile(sis2src+foutname,"c")
-print("CICE5 file being created : "+sis2src+foutname)
+do  nd = 0,ndates-1
 
-; obtain the number of categories 
-; specify the number of layers 
-; note that part_size includes the first category as open water
-; both SIS2 and CICE5 use a single snow layer
+ cdate = dates(nd) 
+ ; specify the name of the SIS2 restart file
+ finname=cdate+"/mom6_da/ice_model.res.nc"
 
-sis2dims = dimsizes(fin->part_size)
-ncat = sis2dims(1) - 1
-; 1 = sis2, 2 = cice55
-nilyr1 = 4
-nilyr2 = 7
-nsnwlyr = 1
+ if (isfilepresent(sis2src+finname))
+  fin  = addfile(sis2src+finname,"r")
+  print("SIS2 file being converted : "+sis2src+finname)
 
-print("SIS2 input file with ncat = "+ncat+" and nlayers = "+nilyr1)
-print("CICE5 output file with ncat = "+ncat+" and nlayers = "+nilyr2)
+  ; specify the name of the new CICE5 restart file
+  foutname=cdate+"/mom6_da/cice5_model_0.25.res_"+cdate+".nc"
+  ; get output file ready
+  system("/bin/rm -f "+sis2src+foutname)
+  fout = addfile(sis2src+foutname,"c")
+  print("CICE5 file being created : "+sis2src+foutname)
+
+  ; obtain the number of categories 
+  ; specify the number of layers 
+  ; note that part_size includes the first category as open water
+  ; both SIS2 and CICE5 use a single snow layer
+
+  sis2dims = dimsizes(fin->part_size)
+  ncat = sis2dims(1) - 1
+  ; 1 = sis2, 2 = cice55
+  nilyr1 = 4
+  nilyr2 = 7
+  nsnwlyr = 1
+
+  print("SIS2 input file with ncat = "+ncat+" and nlayers = "+nilyr1)
+  print("CICE5 output file with ncat = "+ncat+" and nlayers = "+nilyr2)
 
 ;************************************************
 ; Define new CICE5 variables
 ;************************************************
 
-    aicen = new((/ncat,nj,ni/),double)
+   aicen = new((/ncat,nj,ni/),double)
 ; layer variables
     qice = new((/nilyr2,ncat,nj,ni/),double)
     sice = new((/nilyr2,ncat,nj,ni/),double)
 ; cice5 ice_restart_driver does not read this field
-     Tin = new((/nilyr2,ncat,nj,ni/),double)
+    ;Tin = new((/nilyr2,ncat,nj,ni/),double)
 
 ;************************************************
 ; Retrieve SIS2 variables 
 ; SIS2 variables are stored with time dimension
 ;************************************************
 
-; these variables have no categories or layers
-  uvel = fin->u_ice_C(0,:,:)
-  vvel = fin->v_ice_C(0,:,:)
-coszen = fin->coszen(0,:,:)
- swvdr = fin->flux_sw_vis_dir(0,:,:)
- swvdf = fin->flux_sw_vis_dif(0,:,:)
- swidr = fin->flux_sw_nir_dir(0,:,:)
- swidf = fin->flux_sw_nir_dif(0,:,:)
+  ; these variables have no categories or layers
+    uvel = fin->u_ice_C(0,:,:)
+    vvel = fin->v_ice_C(0,:,:)
+  coszen = fin->coszen(0,:,:)
+   swvdr = fin->flux_sw_vis_dir(0,:,:)
+   swvdf = fin->flux_sw_vis_dif(0,:,:)
+   swidr = fin->flux_sw_nir_dir(0,:,:)
+   swidf = fin->flux_sw_nir_dif(0,:,:)
 
-; these variables depend on categories, not including open water
- vicen = fin->h_ice(0,:,:,:)
- vsnon = fin->h_snow(0,:,:,:)
-; T_skin in degC
- Tsfcn = fin->T_skin(0,:,:,:)
-; snow enthalpy, only 1 snow layer for both SIS2 and CICE5
-  qsno = fin->enth_snow(0,:,:,:,:)*rhos
-;print(dimsizes(qsno))
+  ; these variables depend on categories, not including open water
+   vicen = fin->h_ice(0,:,:,:)
+   vsnon = fin->h_snow(0,:,:,:)
+  ; T_skin in degC
+   Tsfcn = fin->T_skin(0,:,:,:)
+  ; snow enthalpy, only 1 snow layer for both SIS2 and CICE5
+    qsno = fin->enth_snow(0,:,:,:,:)*rhos
+  ;print(dimsizes(vicen))
 
-; the SIS2 category ice concentrations
+  ; the SIS2 category ice concentrations
 part_size = fin->part_size(0,:,:,:)
 
-; qice,sice for CICE5's 7 layers are set as average of 4 SIS2 layers
-; retrieve the SIS2 variables averaged over layers
-; enth_ice(0,:,:,:,:) => nlayr1,ncat,nj,ni
-; then dim_avg_n => ncat,nj,ni
-sis2_qice = dim_avg_n(fin->enth_ice(0,:,:,:,:),0)
-sis2_sice = dim_avg_n(fin->sal_ice(0,:,:,:,:),0)
-print(dimsizes(sis2_sice))
-;print(sis2_sice(:,980,500))
+  ; qice,sice for CICE5's 7 layers are set as average of 4 SIS2 layers
+  ; retrieve the SIS2 variables averaged over layers
+  ; enth_ice(0,:,:,:,:) => nlayr1,ncat,nj,ni
+  ; then dim_avg_n => ncat,nj,ni
+  sis2_qice = dim_avg_n(fin->enth_ice(0,:,:,:,:),0)
+  sis2_sice = dim_avg_n(fin->sal_ice(0,:,:,:,:),0)
+  ;print(dimsizes(sis2_sice))
+  ;print(sis2_sice(:,980,500))
 
-do k = 0,ncat-1
-; ice concentration from part_size; k+1 skips the open water category for SIS2
-   aicen(k,:,:) = part_size(k+1,:,:)
-; qice in J/kg, convert to J/m3
- do l = 0,nilyr2-1 
+  do k = 0,ncat-1
+  ; ice concentration from part_size; k+1 skips the open water category for SIS2
+     aicen(k,:,:) = part_size(k+1,:,:)
+   ; qice in J/kg, convert to J/m3
+   do l = 0,nilyr2-1 
     qice(l,k,:,:) = sis2_qice(k,:,:)*rhoi
     sice(l,k,:,:) = sis2_sice(k,:,:)
- end do
-end do
+   end do
+  end do
 
-; get the right units on vicen and vsnon (m)
-vicen = aicen*vicen/rhoi
-vsnon = aicen*vsnon/rhos
+  ; get the right units on vicen and vsnon (m)
+  vicen = aicen*vicen/rhoi
+  vsnon = aicen*vsnon/rhos
 
-; a reasonable salinity profile
-salinz = new((/nilyr2/),double)
-do l = 0,nilyr2-1
+  ; a reasonable salinity profile
+  salinz = new((/nilyr2/),double)
+  do l = 0,nilyr2-1
           zn = (int2dble(l+1)-0.5d0)/int2dble(nilyr2)
    salinz(l) = (saltmax/2.d0)*(1.d0-cos(pi*zn^(nsal/(msal+zn))))
-end do
-Tmltz = salinz / (-18.48 + (0.01848*salinz))
-print(Tmltz)
-
-; sis2 is run with constant ice salinity, so substitue profile salinz
-do l = 0,nilyr2-1
-  sice(l,:,:,:) = salinz(l)
-end do
-
-; get Tin from inverting qice eqn from original script
-; this variable is not required by CICE5 to restart
-do l = 0,nilyr2-1
-;   Tin(l,:,:,:) = (qice(l,:,:,:) + rhoi*Lfresh)/rhoi*cp_ice
-  do k = 0,ncat-1
-   Tin(l,k,:,:) = where(aicen(k,:,:) .eq. 0.0d0, 0.0d0, (qice(l,k,:,:) + rhoi*Lfresh)/rhoi*cp_ice)
   end do
-end do
+  Tmltz = salinz / (-18.48 + (0.01848*salinz))
+  ;print(Tmltz)
 
-;do l = 0,nilyr2-1
-;  Tin(l,:,:,:) = where(Tin(l,:,:,:) .gt. Tmltz(l), Tmltz(l), Tin(l,:,:,:))
-;end do
+  ; sis2 is run with constant ice salinity, so substitue profile salinz
+  do l = 0,nilyr2-1
+    sice(l,:,:,:) = salinz(l)
+  end do
+
+  ; get Tin from inverting qice eqn from original script
+  ; this variable is not required by CICE5 to restart
+  ;do l = 0,nilyr2-1
+  ;   Tin(l,:,:,:) = (qice(l,:,:,:) + rhoi*Lfresh)/rhoi*cp_ice
+  ; do k = 0,ncat-1
+  ;  Tin(l,k,:,:) = where(aicen(k,:,:) .eq. 0.0d0, 0.0d0, (qice(l,k,:,:) + rhoi*Lfresh)/rhoi*cp_ice)
+  ; end do
+  ;end do
+  ;do l = 0,nilyr2-1
+  ;  Tin(l,:,:,:) = where(Tin(l,:,:,:) .gt. Tmltz(l), Tmltz(l), Tin(l,:,:,:))
+  ;end do
 
 ;************************************************
 ; SIS2 restart has missing values but no attribute for it
 ; set the fill value for uvel and use it to replace missing values
 ;************************************************
 
-uvel@_FillValue = default_fillvalue("double")
+   uvel@_FillValue = default_fillvalue("double")
 
-  vvel = where(ismissing(uvel), 0.0d0,   vvel)
-coszen = where(ismissing(uvel), 0.0d0, coszen)
- swvdr = where(ismissing(uvel), 0.0d0,  swvdr)
- swvdf = where(ismissing(uvel), 0.0d0,  swvdf)
- swidr = where(ismissing(uvel), 0.0d0,  swidr)
- swidf = where(ismissing(uvel), 0.0d0,  swidf)
+    vvel = where(ismissing(uvel), 0.0d0,   vvel)
+  coszen = where(ismissing(uvel), 0.0d0, coszen)
+   swvdr = where(ismissing(uvel), 0.0d0,  swvdr)
+   swvdf = where(ismissing(uvel), 0.0d0,  swvdf)
+   swidr = where(ismissing(uvel), 0.0d0,  swidr)
+   swidf = where(ismissing(uvel), 0.0d0,  swidf)
 
-do k = 0,ncat-1
- aicen(k,:,:) = where(ismissing(uvel), 0.0d0, aicen(k,:,:))
- vicen(k,:,:) = where(ismissing(uvel), 0.0d0, vicen(k,:,:))
- vsnon(k,:,:) = where(ismissing(uvel), 0.0d0, vsnon(k,:,:))
- Tsfcn(k,:,:) = where(ismissing(uvel), 0.0d0, Tsfcn(k,:,:))
- do l = 0,nsnwlyr-1
-  qsno(l,k,:,:) = where(ismissing(uvel), 0.0d0,  qsno(l,k,:,:))
- end do
- do l = 0,nilyr2-1
-  sice(l,k,:,:) = where(ismissing(uvel), 0.0d0,  sice(l,k,:,:))
-   Tin(l,k,:,:) = where(ismissing(uvel), 0.0d0,   Tin(l,k,:,:))
- end do
-end do
+  do k = 0,ncat-1
+   aicen(k,:,:) = where(ismissing(uvel), 0.0d0, aicen(k,:,:))
+   vicen(k,:,:) = where(ismissing(uvel), 0.0d0, vicen(k,:,:))
+   vsnon(k,:,:) = where(ismissing(uvel), 0.0d0, vsnon(k,:,:))
+   Tsfcn(k,:,:) = where(ismissing(uvel), 0.0d0, Tsfcn(k,:,:))
+   do l = 0,nsnwlyr-1
+    qsno(l,k,:,:) = where(ismissing(uvel), 0.0d0,  qsno(l,k,:,:))
+   end do
+   do l = 0,nilyr2-1
+    sice(l,k,:,:) = where(ismissing(uvel), 0.0d0,  sice(l,k,:,:))
+     ;Tin(l,k,:,:) = where(ismissing(uvel), 0.0d0,   Tin(l,k,:,:))
+   end do
+  end do
   
 ; remove uvel missing value
   uvel = where(ismissing(uvel), 0.0d0,   uvel)
@@ -210,31 +226,31 @@ end do
 ; Initialize these CICE5 variables to zero
 ;************************************************
 
-scale_factor = uvel*0.
-    strocnxT = uvel*0.
-    strocnyT = uvel*0.
-   frz_onset = uvel*0.
-; set all stresses as zero (no longer directly comparable form from SIS2) 
-   stressp_1 = uvel*0.
-   stressp_2 = uvel*0.
-   stressp_3 = uvel*0.
-   stressp_4 = uvel*0.
-   stressm_1 = uvel*0.
-   stressm_2 = uvel*0.
-   stressm_3 = uvel*0.
-   stressm_4 = uvel*0.
-  stress12_1 = uvel*0.
-  stress12_2 = uvel*0.
-  stress12_3 = uvel*0.
-  stress12_4 = uvel*0.
-
-;************************************************
-; dump to netcdf follows original script
-;************************************************
+  scale_factor = uvel*0.
+      strocnxT = uvel*0.
+      strocnyT = uvel*0.
+     frz_onset = uvel*0.
+  ; set all stresses as zero (no longer directly comparable form from SIS2) 
+     stressp_1 = uvel*0.
+     stressp_2 = uvel*0.
+     stressp_3 = uvel*0.
+     stressp_4 = uvel*0.
+     stressm_1 = uvel*0.
+     stressm_2 = uvel*0.
+     stressm_3 = uvel*0.
+     stressm_4 = uvel*0.
+    stress12_1 = uvel*0.
+    stress12_2 = uvel*0.
+    stress12_3 = uvel*0.
+    stress12_4 = uvel*0.
 
 ; set a flag to skip writing the file while debugging
 write_the_file = "yes"
 if(write_the_file .eq. "yes")then
+
+;************************************************
+; dump to netcdf follows original script
+;************************************************
 
 setfileoption("nc","format","LargeFile")
 
@@ -289,7 +305,7 @@ filevardef(fout,"sice006",typeof(sice),(/"ncat","nj","ni"/))
 filevardef(fout,"sice007",typeof(sice),(/"ncat","nj","ni"/))
 filevardef(fout,"qsno001",typeof(qsno),(/"ncat","nj","ni"/))
 filevardef(fout,"frz_onset",typeof(frz_onset),(/"nj","ni"/))
-filevardef(fout,"Tin",typeof(Tin),(/"nilyr","ncat","nj","ni"/))
+;filevardef(fout,"Tin",typeof(Tin),(/"nilyr","ncat","nj","ni"/))
 
 setfileoption(fout,"DefineMode",False)
 
@@ -370,8 +386,8 @@ print ("writing qice006")
 fout->qice006 = (/qice(5,:,:,:)/)
 print ("writing qice007")
 fout->qice007 = (/qice(6,:,:,:)/)
-print ("writing Tin")
-fout->Tin = (/Tin/)
+;print ("writing Tin")
+;fout->Tin = (/Tin/)
 print ("writing sice001")
 fout->sice001 = (/sice(0,:,:,:)/)
 print ("writing sice002")
@@ -389,8 +405,18 @@ fout->sice007 = (/sice(6,:,:,:)/)
 print ("writing qsno001")
 fout->qsno001 = (/qsno(0,:,:,:)/)
 
-; debugging, skip writing
+; debugging, write_the_file
 end if
+
+  ; clean up 
+  delete(fin)
+  delete(fout)
+  delete(aicen)
+  delete(qice)
+  delete(sice)
+  ;delete(Tin)
+ end if ; file is present
+end do ; ndates
 
 print ("The END")
 exit

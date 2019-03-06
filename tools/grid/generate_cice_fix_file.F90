@@ -7,7 +7,7 @@ program generate_cice_fix_file
 #define output_grid_qdeg
 ! writes out additional variables not needed by CICE but which can be 
 ! helpful in diagnosing grid generation errors
-!#define debug_output
+#define debug_output
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 ! this code generate CICE gird fixed file based on MOM6 ocean_hgrid.nc
 ! information on MOM6 supergrid can be found at
@@ -135,11 +135,12 @@ program generate_cice_fix_file
   real(kind=8), dimension(ni,nj) ::  htn, hte
   real(kind=8), dimension(ni,nj) :: angle
 
-  integer, parameter :: nxtra = 7
+  integer, parameter :: nxtra = 9
 
   real(kind=8), dimension(ni,nj) ::  latT, lonT  ! lat and lon of T on C-grid
   real(kind=8), dimension(ni,nj) :: latCv, lonCv ! lat and lon of V on C-grid
   real(kind=8), dimension(ni,nj) :: latCu, lonCu ! lat and lon of U on C-grid
+  real(kind=8), dimension(ni,nj) :: latBu, lonBu ! lat and lon of U on B-grid (ie corners of C-grid !!)
   real(kind=8), dimension(ni,nj) :: anglet
 #ifdef debug_output
   integer, parameter :: ncice = nreqd + nxtra
@@ -316,10 +317,12 @@ program generate_cice_fix_file
       lonT(i,j) =     x(i2-1,j2-1)
      lonCu(i,j) =     x(i2,  j2-1)
      lonCv(i,j) =     x(i2-1,j2  )
+     lonBu(i,j) =     x(i2,  j2  )
     !deg
       latT(i,j) =     y(i2-1,j2-1)
      latCu(i,j) =     y(i2,  j2-1)
      latCv(i,j) =     y(i2-1,j2  )
+     latBu(i,j) =     y(i2,  j2  )
     !in rad already
     anglet(i,j) = -angq(i2-1,j2-1)
    enddo
@@ -459,6 +462,12 @@ program generate_cice_fix_file
 
   status = nf90_inq_varid(ncid, 'latCu',      id)
   status = nf90_put_var(ncid,        id,   latCu)
+
+  status = nf90_inq_varid(ncid, 'lonBu',      id)
+  status = nf90_put_var(ncid,        id,   lonBu)
+
+  status = nf90_inq_varid(ncid, 'latBu',      id)
+  status = nf90_put_var(ncid,        id,   latBu)
 #endif
   status = nf90_close(ncid)
 

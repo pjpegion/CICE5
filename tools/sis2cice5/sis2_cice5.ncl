@@ -194,6 +194,7 @@ do k = 0,ncat-1
   qsno(l,k,:,:) = where(ismissing(uvel), 0.0d0,  qsno(l,k,:,:))
  end do
  do l = 0,nilyr2-1
+  qice(l,k,:,:) = where(ismissing(uvel), 0.0d0,  qice(l,k,:,:))
   sice(l,k,:,:) = where(ismissing(uvel), 0.0d0,  sice(l,k,:,:))
    Tin(l,k,:,:) = where(ismissing(uvel), 0.0d0,   Tin(l,k,:,:))
  end do

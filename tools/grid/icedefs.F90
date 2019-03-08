@@ -7,7 +7,7 @@ module icegriddefs
   type icedefs
     character(len=12)   ::  var_name
     character(len=64)   :: long_name
-    character(len=14)   :: unit_name
+    character(len=12)   :: unit_name
     character(len= 2)   ::  var_type
   end type icedefs
 
@@ -60,42 +60,32 @@ module icegriddefs
    ii = ii + 1
    icegrid(ii)%var_name  = 'lonT'
    icegrid(ii)%long_name = 'Longitude of center (T) points'
-   icegrid(ii)%unit_name = 'degrees_east'
+   icegrid(ii)%unit_name = 'degrees'
 
    ii = ii + 1
    icegrid(ii)%var_name  = 'latT'
    icegrid(ii)%long_name = 'Latitude of center (T) points'
-   icegrid(ii)%unit_name = 'degrees_north'
+   icegrid(ii)%unit_name = 'degrees'
 
    ii = ii + 1
    icegrid(ii)%var_name  = 'lonCv'
    icegrid(ii)%long_name = 'Longitude of meridional velocity (Cv) points'
-   icegrid(ii)%unit_name = 'degrees_east'
+   icegrid(ii)%unit_name = 'degrees'
 
    ii = ii + 1
    icegrid(ii)%var_name  = 'latCv'
    icegrid(ii)%long_name = 'Latitude of meridional velocity (Cv) points'
-   icegrid(ii)%unit_name = 'degrees_north'
+   icegrid(ii)%unit_name = 'degrees'
 
    ii = ii + 1
    icegrid(ii)%var_name  = 'lonCu'
    icegrid(ii)%long_name = 'Longitude of zonal velocity (Cu) points'
-   icegrid(ii)%unit_name = 'degrees_east'
+   icegrid(ii)%unit_name = 'degrees'
 
    ii = ii + 1
    icegrid(ii)%var_name  = 'latCu'
    icegrid(ii)%long_name = 'Latitude of zonal velocity (Cu) points'
-   icegrid(ii)%unit_name = 'degrees_north'
-
-   ii = ii + 1
-   icegrid(ii)%var_name  = 'lonBu'
-   icegrid(ii)%long_name = 'Longitude of corners (Bu) points'
-   icegrid(ii)%unit_name = 'degrees_east'
-
-   ii = ii + 1
-   icegrid(ii)%var_name  = 'latBu'
-   icegrid(ii)%long_name = 'Latitude of corners (Bu) points'
-   icegrid(ii)%unit_name = 'degrees_north'
+   icegrid(ii)%unit_name = 'degrees'
 
  end subroutine ice_typedefine
 end module icegriddefs

@@ -20,10 +20,16 @@ begin
 ; angle values
 ;************************************************
 
-   nemsrc  = "/scratch4/NCEPDEV/ocean/save/Denise.Worthen/NEMS_INPUT0.1/"
+   dirname="/scratch3/NCEPDEV/stmp2/Denise.Worthen/Benchtest/"
+   res="025"
+   system("/bin/mkdir "+dirname+res)
 
-   wgtsrc  = "$WORK/EMC_CICE/tools/post/"
-   wgtfile = "cice5_tripole_tgrid_rect024.nc"
+   ;nemsrc  = "/scratch4/NCEPDEV/ocean/save/Denise.Worthen/NEMS_INPUT0.1/"
+
+   ;wgtsrc  = "$WORK/EMC_CICE/tools/post/"
+   ;wgtfile = "cice5_tripole_tgrid_rect024.nc"
+   wgtsrc  = "/scratch4/NCEPDEV/ocean/save/Bhavani.Rajan/post/"
+   wgtfile = "remap.grid_t."+res+"deg.bil.nc"
       wgts = wgtsrc + wgtfile
 
 ;************************************************
@@ -32,15 +38,15 @@ begin
 ; to supply the specific names in your remap file
 ;************************************************
 
-        dstgrid = "etopo024_oceanmask.nc"
-     dstlatname = "lat"
-     dstlonname = "lon"
-    dstmaskname = "wet"
+    ;    dstgrid = "etopo024_oceanmask.nc"
+    ; dstlatname = "lat"
+    ; dstlonname = "lon"
+    ;dstmaskname = "wet"
 
-      gridfile = addfile(nemsrc+"regrids/"+dstgrid,"r")
-          dstlon = gridfile->$dstlonname$
-          dstlat = gridfile->$dstlatname$
-         dstmask = gridfile->$dstmaskname$
+     ; gridfile = addfile(nemsrc+"regrids/"+dstgrid,"r")
+      ;    dstlon = gridfile->$dstlonname$
+      ;    dstlat = gridfile->$dstlatname$
+      ;   dstmask = gridfile->$dstmaskname$
 
 ;************************************************
 ; make a list of the files from the run
@@ -52,7 +58,7 @@ begin
    icefilelist = systemfunc("ls "+dirname+"ice*.nc") 
           icef = addfiles(icefilelist,"r")
         nfiles = dimsizes(icefilelist)
-   ; print(nfiles)
+    ;print(nfiles)
     
    ; use the first file to retrieve grid variables
     tmask = icef[0]->tmask
@@ -73,9 +79,9 @@ begin
     ; find the index where the actual filename begins
      indstr = str_index_of_substr(outfile, "/", -1)
     ; insert a sub-directory name
-    outfile = str_insert(outfile,"024/",indstr+1)
+    outfile = str_insert(outfile,res+"/",indstr+1)
     ; insert a string indicating regridding resolution
-    outfile = str_insert(outfile,"024.",-3)
+    outfile = str_insert(outfile,res+".",-3)
     system("/bin/rm -f "+outfile)
 
          df = addfile(outfile,"c")
@@ -120,10 +126,10 @@ begin
 
      print("regridding file "+ii)
      ; regrid all variables using weights file
-     df->aice_h = ESMF_regrid_with_weights(aice_h, wgts, True)
-     df->hi_h = ESMF_regrid_with_weights(hi_h, wgts, True)
-     df->uvel_h  = ESMF_regrid_with_weights(   uvel_h, wgts, True)
-     df->vvel_h  = ESMF_regrid_with_weights(   vvel_h, wgts, True)
+     df->aice_h = ESMF_regrid_with_weights(aice_h, wgts, False)
+     df->hi_h = ESMF_regrid_with_weights(hi_h, wgts, False)
+     df->uvel_h  = ESMF_regrid_with_weights(   uvel_h, wgts, False)
+     df->vvel_h  = ESMF_regrid_with_weights(   vvel_h, wgts, False)
      delete(df)
 
    end do ; nfiles

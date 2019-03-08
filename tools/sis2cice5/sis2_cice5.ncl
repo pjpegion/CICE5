@@ -54,8 +54,8 @@ kmt = fmask->kmt
 iceumask = todouble(kmt)
 
 ; specify the date of the restart being created 
-;cdate="2011040100"
-cdate="2011090100"
+cdate="2011040100"
+;cdate="2011090100"
 
 ; specify the name of the SIS2 restart file
 finname="ice_model.res_"+cdate+".nc"

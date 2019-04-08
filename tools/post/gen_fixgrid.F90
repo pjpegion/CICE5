@@ -3,7 +3,7 @@ program gen_fixgrid
 ! Denise.Worthen@noaa.gov
 !
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-! this is a stripped down and slightly modified version of the code used 
+! this is a stripped down and modified version of the code used 
 ! to generate the CICE5 grid from the MOM6 supergrid (ocean_hgrid.nc)
 !
 ! this code generates a fixed grid file and is used to create the interpolation
@@ -42,12 +42,28 @@ program gen_fixgrid
 !  ipL-1     ipL    ipL+1
 !     x-------x-------x 
 !
+! Vertices are defined counter-clockwise from upper right. T-grid vertices
+! are located on the Bu grid; Cu vertices on the Cv grid, Cv vertices on the Cu
+! grid and Bu vertices on the T grid. For example, for the T-grid, the vertices
+! are: 
 !
-! Vertices are defined:
-!   
-!             vert(2,i,j)             vert(1,i,j)  
+!             Bu(i-1,j)             Bu(i,j)  
 !                            T(i,j)
-!             vert(3,i,j)             vert(4,i,j)
+!           Bu(i-1,j-1)             Bu(i,j-1)
+!
+! so that the vertices of any T(i,j) are found as off-sets from the i,j index: 
+! 
+!     iVertT(4) = (/0, -1, -1, 0/)
+!     jVertT(4) = (/0, 0, -1, -1/)
+! 
+! Careful examination of the Cu,Cv and Bu grids lead to similar definitions for the
+! i,j offsets required to extract the other grid stragger vertices locations.
+!  
+! Special treatment is require at the bottom of the grid, where the verticies of the
+! T and Cu grid must be set manually (note, these points are on land.) The top of 
+! the grid also requires special treatment because the required verticies are located
+! across the tripole seam. This is accomplished by creating 1-d arrays which hold
+! the T and Cu grid point locations on the matched seam.
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
   use netcdf
@@ -56,7 +72,7 @@ program gen_fixgrid
   implicit none
   integer, parameter :: ni = 1440, nj = 1080, nv = 4
   character(len=256) :: dirsrc = '/scratch4/NCEPDEV/nems/noscrub/emc.nemspara/RT/FV3-MOM6-CICE5/benchmark-20180913/MOM6_FIX_025deg/'
-  character(len=256) :: dirout = './'
+  character(len=256) :: dirout = '/scratch4/NCEPDEV/ocean/save/Denise.Worthen/NEMS_INPUT0.1/ocnicepost/'
   character(len= 10) :: res = 'mx025'
 
   real(kind=8), parameter ::      pi = 4.0*atan(1.0)
@@ -184,20 +200,6 @@ program gen_fixgrid
 
   j = nj
   i1 = ipole(1); i2 = ipole(2)+1
-  print *,'latCv across seam '
-  print *,latCv(i1-2,j),latCv(i2+2,j)
-  print *,latCv(i1-1,j),latCv(i2+1,j)
-  print *,latCv(i1,  j),latCv(i2,  j)
-  print *,latCv(i1+1,j),latCv(i2-1,j)
-  print *,latCv(i1+2,j),latCv(i2-2,j)
-
-  print *,'lonCv across seam '
-  print *,lonCv(i1-2,j),lonCv(i2+2,j)
-  print *,lonCv(i1-1,j),lonCv(i2+1,j)
-  print *,lonCv(i1,  j),lonCv(i2,  j)
-  print *,lonCv(i1+1,j),lonCv(i2-1,j)
-  print *,lonCv(i1+2,j),lonCv(i2-2,j)
-
   print *,'latCu across seam '
   print *,latCu(i1-2,j),latCu(i2+1,j)
   print *,latCu(i1-1,j),latCu(i2+0,j)
@@ -233,6 +235,16 @@ program gen_fixgrid
     xlatT(i) = latT(i2,nj)
   enddo
 
+  !do i = 1,10
+  !  i2 = ipole(2)+(ipole(1)-i)
+  !  print *,i,i2,lonCu(i,nj)
+  !enddo
+  !do i = 1430,1440
+  !  i2 = ipole(2)+(ipole(1)-i)
+  !  if(i2 .lt. 1)i2 = ni
+  !  print *,i,i2,lonCu(i,nj)
+  !enddo
+ 
   do i = 1,ni
     i2 = ipole(2)+(ipole(1)-i)
     if(i2 .lt. 1)i2 = ni
@@ -241,60 +253,55 @@ program gen_fixgrid
   enddo
   
   print *,'============== T grid ==============='
-  do i = 355,365
-   print '(i5,6f12.5)',i,lonT(i,nj),xlonT(i),lonT(i,nj)+xlonT(i),latT(i,nj),xlatT(i),latT(i,nj)-xlatT(i)
-  enddo
-  print *
-  do i = 355,365
+  print *,'============== Left pole ============'
+  do i = ipole(1)-2,ipole(1)+2
    print '(i5,6f12.5)',i,lonT(i,nj),xlonT(i),lonT(i,nj)+xlonT(i),latT(i,nj),xlatT(i),latT(i,nj)-xlatT(i)
   enddo
   print *
 
-  do i = 1075,1085
-   print '(i5,6f12.5)',i,lonT(i,nj),xlonT(i),lonT(i,nj)+xlonT(i),latT(i,nj),xlatT(i),latT(i,nj)-xlatT(i)
-  enddo
-  print *
-  do i = 1075,1085
+  print *,'============ Right pole ============'
+  do i = ipole(2)-2,ipole(2)+2
    print '(i5,6f12.5)',i,lonT(i,nj),xlonT(i),lonT(i,nj)+xlonT(i),latT(i,nj),xlatT(i),latT(i,nj)-xlatT(i)
   enddo
   print *
 
   print *,'============== T grid ==============='
-  do i = 1430,1440
+  print *,'============== Left edge ============'
+  do i = 1,5
    print '(i5,6f12.5)',i,lonT(i,nj),xlonT(i),lonT(i,nj)+xlonT(i),latT(i,nj),xlatT(i),latT(i,nj)-xlatT(i)
   enddo
   print *
-  do i = 1430,1440
+  print *,'============== Right edge ==========='
+  do i = ni-4,ni
    print '(i5,6f12.5)',i,lonT(i,nj),xlonT(i),lonT(i,nj)+xlonT(i),latT(i,nj),xlatT(i),latT(i,nj)-xlatT(i)
   enddo
+  print *
+
 
   print *,'============== Cu grid ==============='
-  do i = 355,365
-   print '(i5,6f12.5)',i,lonCu(i,nj),xlonCu(i),lonCu(i,nj)+xlonCu(i),latCu(i,nj),xlatCu(i),latCu(i,nj)-xlatCu(i)
-  enddo
-  print *
-  do i = 355,365
+  print *,'============== Left pole ============='
+  do i = ipole(1)-2,ipole(1)+2
    print '(i5,6f12.5)',i,lonCu(i,nj),xlonCu(i),lonCu(i,nj)+xlonCu(i),latCu(i,nj),xlatCu(i),latCu(i,nj)-xlatCu(i)
   enddo
   print *
 
-  do i = 1075,1085
+  print *,'============ Right pole ============'
+  do i = ipole(2)-2,ipole(2)+2
    print '(i5,6f12.5)',i,lonCu(i,nj),xlonCu(i),lonCu(i,nj)+xlonCu(i),latCu(i,nj),xlatCu(i),latCu(i,nj)-xlatCu(i)
   enddo
   print *
-  do i = 1075,1085
-   print '(i5,6f12.5)',i,lonCu(i,nj),xlonCu(i),lonCu(i,nj)+xlonCu(i),latCu(i,nj),xlatCu(i),latCu(i,nj)-xlatCu(i)
-  enddo
-  print * 
 
   print *,'============== Cu grid ==============='
-  do i = 1430,1440
+  print *,'============== Left edge ============'
+  do i = 1,5
    print '(i5,6f12.5)',i,lonCu(i,nj),xlonCu(i),lonCu(i,nj)+xlonCu(i),latCu(i,nj),xlatCu(i),latCu(i,nj)-xlatCu(i)
   enddo
   print *
-  do i = 1430,1440
+  print *,'============== Right edge ==========='
+  do i = ni-4,ni
    print '(i5,6f12.5)',i,lonCu(i,nj),xlonCu(i),lonCu(i,nj)+xlonCu(i),latCu(i,nj),xlatCu(i),latCu(i,nj)-xlatCu(i)
   enddo
+  print *
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 ! fill grid vertices variables

@@ -2,11 +2,7 @@ CDF=/apps/netcdf/4.3.0-intel
 #####################################################################
 # compiler options
 # #####################################################################
-#FOPT = -O
-#FOPT = -C -warn all
 FOPT = -C 
-#FOPT = -convert big_endian
-#FOPT = -p
 
  F90 = ifort
 # #F90 = ifort -warn

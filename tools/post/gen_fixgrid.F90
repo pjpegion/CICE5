@@ -42,22 +42,26 @@ program gen_fixgrid
 !  ipL-1     ipL    ipL+1
 !     x-------x-------x 
 !
+!
 ! Vertices are defined counter-clockwise from upper right. T-grid vertices
 ! are located on the Bu grid; Cu vertices on the Cv grid, Cv vertices on the Cu
 ! grid and Bu vertices on the T grid. For example, for the T-grid, the vertices
 ! are: 
-!
+!             Vertex #2             Vertex #1
 !             Bu(i-1,j)             Bu(i,j)  
-!                            T(i,j)
+!                         T(i,j)
 !           Bu(i-1,j-1)             Bu(i,j-1)
+!             Vertex #3             Vertex #4
 !
-! so that the vertices of any T(i,j) are found as off-sets from the i,j index: 
+! so that the vertices of any T(i,j) are found as off-sets of the i,j index on the
+! Bu grid 
 ! 
 !     iVertT(4) = (/0, -1, -1, 0/)
 !     jVertT(4) = (/0, 0, -1, -1/)
 ! 
 ! Careful examination of the Cu,Cv and Bu grids lead to similar definitions for the
-! i,j offsets required to extract the other grid stragger vertices locations.
+! i,j offsets required to extract the other grid stragger vertices locations, all of
+! which can be defined in terms of the iVertT and jVertT values
 !  
 ! Special treatment is require at the bottom of the grid, where the verticies of the
 ! T and Cu grid must be set manually (note, these points are on land.) The top of 
@@ -82,11 +86,16 @@ program gen_fixgrid
   integer, parameter :: nx  = ni*2, ny  = nj*2
   real(kind=8), dimension(0:nx,0:ny)   :: x, y
 
+  ! land mask
+  integer(kind=4), dimension(ni,nj) :: wet
+
+  ! grid stagger locations
   real(kind=8), dimension(ni,nj) ::  latT, lonT  ! lat and lon of T on C-grid
   real(kind=8), dimension(ni,nj) :: latCv, lonCv ! lat and lon of V on C-grid
   real(kind=8), dimension(ni,nj) :: latCu, lonCu ! lat and lon of U on C-grid
   real(kind=8), dimension(ni,nj) :: latBu, lonBu ! lat and lon of corners on C-grid
 
+  ! vertices of each stagger location
   real(kind=8), dimension(ni,nj,nv) ::  latT_vert,  lonT_vert
   real(kind=8), dimension(ni,nj,nv) :: latCu_vert, lonCu_vert
   real(kind=8), dimension(ni,nj,nv) :: latCv_vert, lonCv_vert
@@ -114,7 +123,7 @@ program gen_fixgrid
   integer :: rc,ncid
   integer :: id, dim2(2), dim3(3)
   integer :: ni_dim,nj_dim,nv_dim
-  integer :: i,j,n,m,ii,jj,i2,j2,ip1,im1,jp1,jm1
+  integer :: i,j,n,ii,jj,i2,j2,ip1,im1
   integer :: ipole(2),i1
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -142,6 +151,18 @@ program gen_fixgrid
   latCu_vert = -9999.0 ; lonCu_vert = -9999.0
   latCv_vert = -9999.0 ; lonCv_vert = -9999.0
   latBu_vert = -9999.0 ; lonBu_vert = -9999.0
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! read the land mask
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+  fname_in = trim(dirsrc)//"ocean_mask.nc"
+  rc = nf90_open(fname_in, nf90_nowrite, ncid)
+  rc = nf90_inq_varid(ncid, 'mask',    id) 
+  rc = nf90_get_var(ncid,       id,  latT) !temp use
+  rc = nf90_close(ncid)
+
+  wet = int(latT,4)
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 ! read supergrid file
@@ -182,6 +203,10 @@ program gen_fixgrid
    enddo
   enddo
 
+  !where(lonT .lt. 0.0)lonT = lonT + 360.d0
+  !where(lonCu .lt. 0.0)lonCu = lonCu + 360.d0
+  !where(lonCv .lt. 0.0)lonCv = lonCv + 360.d0
+  !where(lonBu .lt. 0.0)lonBu = lonBu + 360.d0
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 ! some basic error checking
 ! find the i-th index of the poles at j= nj
@@ -201,32 +226,40 @@ program gen_fixgrid
   j = nj
   i1 = ipole(1); i2 = ipole(2)+1
   print *,'latCu across seam '
+  print *,latCu(i1-3,j),latCu(i2+2,j),latCu(i1-3,j)-latCu(i2+2,j)
   print *,latCu(i1-2,j),latCu(i2+1,j)
   print *,latCu(i1-1,j),latCu(i2+0,j)
   print *,latCu(i1,  j),latCu(i2-1,j)
   print *,latCu(i1+1,j),latCu(i2-2,j)
   print *,latCu(i1+2,j),latCu(i2-3,j)
+  print *,latCu(i1+3,j),latCu(i2-4,j)
 
   print *,'lonCu across seam '
+  print *,lonCu(i1-3,j),lonCu(i2+2,j),lonCu(i1-3,j)+lonCu(i2+2,j)
   print *,lonCu(i1-2,j),lonCu(i2+1,j)
   print *,lonCu(i1-1,j),lonCu(i2+0,j)
   print *,lonCu(i1,  j),lonCu(i2-1,j)
   print *,lonCu(i1+1,j),lonCu(i2-2,j)
   print *,lonCu(i1+2,j),lonCu(i2-3,j)
+  print *,lonCu(i1+3,j),lonCu(i2-4,j)
 
   print *,'latT across seam '
+  print *,latT(i1-3,j),latT(i2+3,j),latT(i1-3,j)-latT(i2+3,j)
   print *,latT(i1-2,j),latT(i2+2,j)
   print *,latT(i1-1,j),latT(i2+1,j)
   print *,latT(i1,  j),latT(i2,  j)
   print *,latT(i1+1,j),latT(i2-1,j)
   print *,latT(i1+2,j),latT(i2-2,j)
+  print *,latT(i1+3,j),latT(i2-3,j)
 
   print *,'lonT across seam '
+  print *,lonT(i1-3,j),lonT(i2+3,j),lonT(i1-3,j)+lonT(i2+3,j)
   print *,lonT(i1-2,j),lonT(i2+2,j)
   print *,lonT(i1-1,j),lonT(i2+1,j)
   print *,lonT(i1,  j),lonT(i2,  j)
   print *,lonT(i1+1,j),lonT(i2-1,j)
   print *,lonT(i1+2,j),lonT(i2-2,j)
+  print *,lonT(i1+3,j),lonT(i2-3,j)
   print *
 
   do i = 1,ni
@@ -251,16 +284,17 @@ program gen_fixgrid
    xlonCu(i) = lonCu(i2,nj)
    xlatCu(i) = latCu(i2,nj)
   enddo
-  
+ 
+ 
   print *,'============== T grid ==============='
   print *,'============== Left pole ============'
-  do i = ipole(1)-2,ipole(1)+2
+  do i = ipole(1)-3,ipole(1)+3
    print '(i5,6f12.5)',i,lonT(i,nj),xlonT(i),lonT(i,nj)+xlonT(i),latT(i,nj),xlatT(i),latT(i,nj)-xlatT(i)
   enddo
   print *
 
   print *,'============ Right pole ============'
-  do i = ipole(2)-2,ipole(2)+2
+  do i = ipole(2)-3,ipole(2)+3
    print '(i5,6f12.5)',i,lonT(i,nj),xlonT(i),lonT(i,nj)+xlonT(i),latT(i,nj),xlatT(i),latT(i,nj)-xlatT(i)
   enddo
   print *
@@ -280,13 +314,13 @@ program gen_fixgrid
 
   print *,'============== Cu grid ==============='
   print *,'============== Left pole ============='
-  do i = ipole(1)-2,ipole(1)+2
+  do i = ipole(1)-3,ipole(1)+3
    print '(i5,6f12.5)',i,lonCu(i,nj),xlonCu(i),lonCu(i,nj)+xlonCu(i),latCu(i,nj),xlatCu(i),latCu(i,nj)-xlatCu(i)
   enddo
   print *
 
   print *,'============ Right pole ============'
-  do i = ipole(2)-2,ipole(2)+2
+  do i = ipole(2)-3,ipole(2)+3
    print '(i5,6f12.5)',i,lonCu(i,nj),xlonCu(i),lonCu(i,nj)+xlonCu(i),latCu(i,nj),xlatCu(i),latCu(i,nj)-xlatCu(i)
   enddo
   print *
@@ -399,6 +433,10 @@ program gen_fixgrid
       latCv_vert(i,j,n)  = xlatCu(ii)
       lonCv_vert(i,j,n)  = xlonCu(ii)
     enddo
+      !latCv_vert(i,j, 1) = latCv_vert(i,j,4)
+      !latCv_vert(i,j, 2) = latCv_vert(i,j,3)
+      !lonCv_vert(i,j, 1) = lonCv_vert(i,j,4)+240.d0
+      !lonCv_vert(i,j, 2) = lonCv_vert(i,j,3)+240.d0
 
     do n = 3,4
       ii = i + iVertBu(n); jj = j + jVertBu(n)
@@ -414,7 +452,68 @@ program gen_fixgrid
       latBu_vert(i,j,n)  = xlatT(ii)
       lonBu_vert(i,j,n)  = xlonT(ii)
     enddo
+      !latBu_vert(i,j, 1) = latBu_vert(i,j,4)
+      !latBu_vert(i,j, 2) = latBu_vert(i,j,3)
+      !lonBu_vert(i,j, 1) = lonBu_vert(i,j,4)+240.d0
+      !lonBu_vert(i,j, 2) = lonBu_vert(i,j,3)+240.d0
   enddo
+
+     i = 1
+  do j = 1,nj
+    if(lont_vert(i,j,1) .lt. 0.0)lont_vert(i,j,1) = lont_vert(i,j,1)+240.d0
+    if(lont_vert(i,j,4) .lt. 0.0)lont_vert(i,j,4) = lont_vert(i,j,4)+240.d0
+  enddo
+
+  ! check
+  i = 1; j = nj
+  print '(f12.5,a,f12.5)',latBu_vert(i,j,2),'        ',latBu_vert(i,j,1)
+  print '(a12,f12.5)','          ',latBu(i,j)
+  print '(f12.5,a,f12.5)',latBu_vert(i,j,3),'        ',latBu_vert(i,j,4)
+  print *
+  print '(f12.5,a,f12.5)',lonBu_vert(i,j,2),'        ',lonBu_vert(i,j,1)
+  print '(a12,f12.5)','          ',lonBu(i,j)
+  print '(f12.5,a,f12.5)',lonBu_vert(i,j,3),'        ',lonBu_vert(i,j,4)
+  print *
+  print *
+  ! check
+  print '(f12.5,a,f12.5)',latCv_vert(i,j,2),'        ',latCv_vert(i,j,1)
+  print '(a12,f12.5)','          ',latCv(i,j)
+  print '(f12.5,a,f12.5)',latCv_vert(i,j,3),'        ',latCv_vert(i,j,4)
+  print *
+  print '(f12.5,a,f12.5)',lonCv_vert(i,j,2),'        ',lonCv_vert(i,j,1)
+  print '(a12,f12.5)','          ',lonCv(i,j)
+  print '(f12.5,a,f12.5)',lonCv_vert(i,j,3),'        ',lonCv_vert(i,j,4)
+
+  print *
+  print *
+
+  i = 1; j = 10
+  print '(f12.5,a,f12.5)',latT_vert(i,j,2),'        ',latT_vert(i,j,1)
+  print '(a12,f12.5)','          ',latT(i,j)
+  print '(f12.5,a,f12.5)',latT_vert(i,j,3),'        ',latT_vert(i,j,4)
+  print *
+  print '(f12.5,a,f12.5)',lonT_vert(i,j,2),'        ',lonT_vert(i,j,1)
+  print '(a12,f12.5)','          ',lonT(i,j)
+  print '(f12.5,a,f12.5)',lonT_vert(i,j,3),'        ',lonT_vert(i,j,4)
+  print *
+  print *
+  ! check
+  print '(f12.5,a,f12.5)',latCu_vert(i,j,2),'        ',latCu_vert(i,j,1)
+  print '(a12,f12.5)','          ',latCu(i,j)
+  print '(f12.5,a,f12.5)',latCu_vert(i,j,3),'        ',latCu_vert(i,j,4)
+  print *
+  print '(f12.5,a,f12.5)',lonCu_vert(i,j,2),'        ',lonCu_vert(i,j,1)
+  print '(a12,f12.5)','          ',lonCu(i,j)
+  print '(f12.5,a,f12.5)',lonCu_vert(i,j,3),'        ',lonCu_vert(i,j,4)
+
+  !print *,minval(latT_vert),maxval(latT_vert)
+  !print *,minval(lonT_vert),maxval(lonT_vert)
+  !print *,minval(latBu_vert),maxval(latBu_vert)
+  !print *,minval(lonBu_vert),maxval(lonBu_vert)
+  !print *,minval(latCu_vert),maxval(latCu_vert)
+  !print *,minval(lonCu_vert),maxval(lonCu_vert)
+  !print *,minval(latCv_vert),maxval(latCv_vert)
+  !print *,minval(lonCv_vert),maxval(lonCv_vert)
 
   if(minval( latT_vert) .lt. -1.e3)stop
   if(minval( lonT_vert) .lt. -1.e3)stop
@@ -434,7 +533,7 @@ program gen_fixgrid
 
   ! define the output variables and file name
   call fixgrid_typedefine
-  fname_out= trim(dirout)//'tripole.grid.'//trim(res)//'.nc'
+  fname_out= trim(dirout)//'tripole.'//trim(res)//'.nc'
   print *,trim(fname_out)
 
   ! create the file
@@ -445,6 +544,11 @@ program gen_fixgrid
   rc = nf90_def_dim(ncid,'ni', ni, ni_dim)
   rc = nf90_def_dim(ncid,'nj', nj, nj_dim)
   rc = nf90_def_dim(ncid,'nv', nv, nv_dim)
+  
+  !mask
+  dim2(2) = nj_dim
+  dim2(1) = ni_dim
+   rc = nf90_def_var(ncid, 'wet', nf90_int, dim2, id)
 
   dim2(2) = nj_dim
   dim2(1) = ni_dim
@@ -469,6 +573,9 @@ program gen_fixgrid
 
    rc = nf90_put_att(ncid, nf90_global, 'history', trim(history))
    rc = nf90_enddef(ncid)
+
+  rc = nf90_inq_varid(ncid,   'wet',      id)
+  rc = nf90_put_var(ncid,        id,     wet)
 
   rc = nf90_inq_varid(ncid,  'lonCt',     id)
   rc = nf90_put_var(ncid,        id,    lonT)

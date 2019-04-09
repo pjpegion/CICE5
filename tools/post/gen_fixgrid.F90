@@ -43,78 +43,67 @@ program gen_fixgrid
 !     x-------x-------x 
 !
 !
-! Vertices are defined counter-clockwise from upper right. T-grid vertices
+! Vertices are defined counter-clockwise from upper right. Ct-grid vertices
 ! are located on the Bu grid; Cu vertices on the Cv grid, Cv vertices on the Cu
-! grid and Bu vertices on the T grid. For example, for the T-grid, the vertices
+! grid and Bu vertices on the Ct grid. For example, for the Ct-grid, the vertices
 ! are: 
 !             Vertex #2             Vertex #1
 !             Bu(i-1,j)             Bu(i,j)  
-!                         T(i,j)
+!                         Ct(i,j)
 !           Bu(i-1,j-1)             Bu(i,j-1)
 !             Vertex #3             Vertex #4
 !
-! so that the vertices of any T(i,j) are found as off-sets of the i,j index on the
+! so that the vertices of any Ct(i,j) are found as off-sets of the i,j index on the
 ! Bu grid 
 ! 
-!     iVertT(4) = (/0, -1, -1, 0/)
-!     jVertT(4) = (/0, 0, -1, -1/)
+!     iVertCt(4) = (/0, -1, -1, 0/)
+!     jVertCt(4) = (/0, 0, -1, -1/)
 ! 
 ! Careful examination of the Cu,Cv and Bu grids lead to similar definitions for the
 ! i,j offsets required to extract the other grid stragger vertices locations, all of
-! which can be defined in terms of the iVertT and jVertT values
+! which can be defined in terms of the iVertCt and jVertCt values
 !  
 ! Special treatment is require at the bottom of the grid, where the verticies of the
-! T and Cu grid must be set manually (note, these points are on land.) The top of 
+! Ctand Cu grid must be set manually (note, these points are on land.) The top of 
 ! the grid also requires special treatment because the required verticies are located
 ! across the tripole seam. This is accomplished by creating 1-d arrays which hold
-! the T and Cu grid point locations on the matched seam.
+! the Ct and Cu grid point locations on the matched seam.
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-  use netcdf
+  use param
   use fixgriddefs
+  use netcdf
 
   implicit none
-  integer, parameter :: ni = 1440, nj = 1080, nv = 4
+
   character(len=256) :: dirsrc = '/scratch4/NCEPDEV/nems/noscrub/emc.nemspara/RT/FV3-MOM6-CICE5/benchmark-20180913/MOM6_FIX_025deg/'
   character(len=256) :: dirout = '/scratch4/NCEPDEV/ocean/save/Denise.Worthen/NEMS_INPUT0.1/ocnicepost/'
   character(len= 10) :: res = 'mx025'
 
-  real(kind=8), parameter ::      pi = 4.0*atan(1.0)
-  real(kind=8), parameter :: deg2rad = pi/180.0d0
-  
   ! super-grid source variables
-  integer, parameter :: nx  = ni*2, ny  = nj*2
   real(kind=8), dimension(0:nx,0:ny)   :: x, y
 
   ! land mask
   integer(kind=4), dimension(ni,nj) :: wet
 
   ! grid stagger locations
-  real(kind=8), dimension(ni,nj) ::  latT, lonT  ! lat and lon of T on C-grid
+  real(kind=8), dimension(ni,nj) :: latCt, lonCt ! lat and lon of T on C-grid
   real(kind=8), dimension(ni,nj) :: latCv, lonCv ! lat and lon of V on C-grid
   real(kind=8), dimension(ni,nj) :: latCu, lonCu ! lat and lon of U on C-grid
   real(kind=8), dimension(ni,nj) :: latBu, lonBu ! lat and lon of corners on C-grid
 
   ! vertices of each stagger location
-  real(kind=8), dimension(ni,nj,nv) ::  latT_vert,  lonT_vert
+  real(kind=8), dimension(ni,nj,nv) :: latCt_vert, lonCt_vert
   real(kind=8), dimension(ni,nj,nv) :: latCu_vert, lonCu_vert
   real(kind=8), dimension(ni,nj,nv) :: latCv_vert, lonCv_vert
   real(kind=8), dimension(ni,nj,nv) :: latBu_vert, lonBu_vert
 
-  ! ij offsets moving counter-clockwise around each T(i,j)
-  integer, dimension(nv) :: iVertT = (/0, -1, -1,  0/)
-  integer, dimension(nv) :: jVertT = (/0,  0, -1, -1/)
-
   integer, dimension(nv) :: iVertBu, iVertCu, iVertCv
   integer, dimension(nv) :: jVertBu, jVertCu, jVertCv 
 
-  ! need across seam values of T,Cu points to retrieve vertices of Bu and Cv grids
-  real(kind=8), dimension(ni) ::  xlonT,  xlatT
+  ! need across seam values of Ct,Cu points to retrieve vertices of Bu and Cv grids
+  real(kind=8), dimension(ni) :: xlonCt, xlatCt
   real(kind=8), dimension(ni) :: xlonCu, xlatCu
-
-  integer, parameter :: ncoord = 2*4             ! 4sets of lat/lon pairs
-  integer, parameter :: nverts = 2*4             ! 4sets of lat/lon pairs vertices
-  integer, parameter ::  nvars = ncoord + nverts
 
   character(len=256) :: fname_out, fname_in
   character(len=256) :: history
@@ -130,12 +119,12 @@ program gen_fixgrid
 ! set up the arrays to retrieve the vertices
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-  iVertCu = iVertT + 1; jVertCu = jVertT + 0
-  iVertCv = iVertT + 0; jVertCv = jVertT + 1
-  iVertBu = iVertT + 1; jVertBu = jVertT + 1
+  iVertCu = iVertCt + 1; jVertCu = jVertCt + 0
+  iVertCv = iVertCt + 0; jVertCv = jVertCt + 1
+  iVertBu = iVertCt + 1; jVertBu = jVertCt + 1
 
-  print '(a8,4i6)','iVertT  ',( iVertT(i),i=1,4)
-  print '(a8,4i6)','jVertT  ',( jVertT(i),i=1,4)
+  print '(a8,4i6)','iVertCt ',(iVertCt(i),i=1,4)
+  print '(a8,4i6)','jVertCt ',(jVertCt(i),i=1,4)
   print *
   print '(a8,4i6)','iVertCu ',(iVertCu(i),i=1,4)
   print '(a8,4i6)','jVertCu ',(jVertCu(i),i=1,4)
@@ -147,7 +136,7 @@ program gen_fixgrid
   print '(a8,4i6)','jVertBu ',(jVertBu(i),i=1,4)
   print *
 
-   latT_vert = -9999.0 ;  lonT_vert = -9999.0
+  latCt_vert = -9999.0 ; lonCt_vert = -9999.0
   latCu_vert = -9999.0 ; lonCu_vert = -9999.0
   latCv_vert = -9999.0 ; lonCv_vert = -9999.0
   latBu_vert = -9999.0 ; lonBu_vert = -9999.0
@@ -159,10 +148,10 @@ program gen_fixgrid
   fname_in = trim(dirsrc)//"ocean_mask.nc"
   rc = nf90_open(fname_in, nf90_nowrite, ncid)
   rc = nf90_inq_varid(ncid, 'mask',    id) 
-  rc = nf90_get_var(ncid,       id,  latT) !temp use
+  rc = nf90_get_var(ncid,       id, latCt) !temp use
   rc = nf90_close(ncid)
 
-  wet = int(latT,4)
+  wet = int(latCt,4)
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 ! read supergrid file
@@ -193,20 +182,20 @@ program gen_fixgrid
      lonBu(i,j) =     x(i2,j2)
      latBu(i,j) =     y(i2,j2)
     !deg
-      lonT(i,j) =     x(i2-1,j2-1)
+     lonCt(i,j) =     x(i2-1,j2-1)
      lonCu(i,j) =     x(i2,  j2-1)
      lonCv(i,j) =     x(i2-1,j2  )
     !deg
-      latT(i,j) =     y(i2-1,j2-1)
+     latCt(i,j) =     y(i2-1,j2-1)
      latCu(i,j) =     y(i2,  j2-1)
      latCv(i,j) =     y(i2-1,j2  )
    enddo
   enddo
 
-  !where(lonT .lt. 0.0)lonT = lonT + 360.d0
-  !where(lonCu .lt. 0.0)lonCu = lonCu + 360.d0
-  !where(lonCv .lt. 0.0)lonCv = lonCv + 360.d0
-  !where(lonBu .lt. 0.0)lonBu = lonBu + 360.d0
+  where(lonCt .lt. 0.0)lonCt = lonCt + 360.d0
+  where(lonCu .lt. 0.0)lonCu = lonCu + 360.d0
+  where(lonCv .lt. 0.0)lonCv = lonCv + 360.d0
+  where(lonBu .lt. 0.0)lonBu = lonBu + 360.d0
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 ! some basic error checking
 ! find the i-th index of the poles at j= nj
@@ -243,29 +232,29 @@ program gen_fixgrid
   print *,lonCu(i1+2,j),lonCu(i2-3,j)
   print *,lonCu(i1+3,j),lonCu(i2-4,j)
 
-  print *,'latT across seam '
-  print *,latT(i1-3,j),latT(i2+3,j),latT(i1-3,j)-latT(i2+3,j)
-  print *,latT(i1-2,j),latT(i2+2,j)
-  print *,latT(i1-1,j),latT(i2+1,j)
-  print *,latT(i1,  j),latT(i2,  j)
-  print *,latT(i1+1,j),latT(i2-1,j)
-  print *,latT(i1+2,j),latT(i2-2,j)
-  print *,latT(i1+3,j),latT(i2-3,j)
+  print *,'latCt across seam '
+  print *,latCt(i1-3,j),latCt(i2+3,j),latCt(i1-3,j)-latCt(i2+3,j)
+  print *,latCt(i1-2,j),latCt(i2+2,j)
+  print *,latCt(i1-1,j),latCt(i2+1,j)
+  print *,latCt(i1,  j),latCt(i2,  j)
+  print *,latCt(i1+1,j),latCt(i2-1,j)
+  print *,latCt(i1+2,j),latCt(i2-2,j)
+  print *,latCt(i1+3,j),latCt(i2-3,j)
 
-  print *,'lonT across seam '
-  print *,lonT(i1-3,j),lonT(i2+3,j),lonT(i1-3,j)+lonT(i2+3,j)
-  print *,lonT(i1-2,j),lonT(i2+2,j)
-  print *,lonT(i1-1,j),lonT(i2+1,j)
-  print *,lonT(i1,  j),lonT(i2,  j)
-  print *,lonT(i1+1,j),lonT(i2-1,j)
-  print *,lonT(i1+2,j),lonT(i2-2,j)
-  print *,lonT(i1+3,j),lonT(i2-3,j)
+  print *,'lonCt across seam '
+  print *,lonCt(i1-3,j),lonCt(i2+3,j),lonCt(i1-3,j)+lonCt(i2+3,j)
+  print *,lonCt(i1-2,j),lonCt(i2+2,j)
+  print *,lonCt(i1-1,j),lonCt(i2+1,j)
+  print *,lonCt(i1,  j),lonCt(i2,  j)
+  print *,lonCt(i1+1,j),lonCt(i2-1,j)
+  print *,lonCt(i1+2,j),lonCt(i2-2,j)
+  print *,lonCt(i1+3,j),lonCt(i2-3,j)
   print *
 
   do i = 1,ni
     i2 = ipole(2)+(ipole(1)-i)+1
-    xlonT(i) = lonT(i2,nj)
-    xlatT(i) = latT(i2,nj)
+    xlonCt(i) = lonCt(i2,nj)
+    xlatCt(i) = latCt(i2,nj)
   enddo
 
   !do i = 1,10
@@ -286,28 +275,28 @@ program gen_fixgrid
   enddo
  
  
-  print *,'============== T grid ==============='
+  print *,'============== Ct grid ==============='
   print *,'============== Left pole ============'
   do i = ipole(1)-3,ipole(1)+3
-   print '(i5,6f12.5)',i,lonT(i,nj),xlonT(i),lonT(i,nj)+xlonT(i),latT(i,nj),xlatT(i),latT(i,nj)-xlatT(i)
+   print '(i5,6f12.5)',i,lonCt(i,nj),xlonCt(i),lonCt(i,nj)+xlonCt(i),latCt(i,nj),xlatCt(i),latCt(i,nj)-xlatCt(i)
   enddo
   print *
 
   print *,'============ Right pole ============'
   do i = ipole(2)-3,ipole(2)+3
-   print '(i5,6f12.5)',i,lonT(i,nj),xlonT(i),lonT(i,nj)+xlonT(i),latT(i,nj),xlatT(i),latT(i,nj)-xlatT(i)
+   print '(i5,6f12.5)',i,lonCt(i,nj),xlonCt(i),lonCt(i,nj)+xlonCt(i),latCt(i,nj),xlatCt(i),latCt(i,nj)-xlatCt(i)
   enddo
   print *
 
-  print *,'============== T grid ==============='
+  print *,'============== Ct grid ==============='
   print *,'============== Left edge ============'
   do i = 1,5
-   print '(i5,6f12.5)',i,lonT(i,nj),xlonT(i),lonT(i,nj)+xlonT(i),latT(i,nj),xlatT(i),latT(i,nj)-xlatT(i)
+   print '(i5,6f12.5)',i,lonCt(i,nj),xlonCt(i),lonCt(i,nj)+xlonCt(i),latCt(i,nj),xlatCt(i),latCt(i,nj)-xlatCt(i)
   enddo
   print *
   print *,'============== Right edge ==========='
   do i = ni-4,ni
-   print '(i5,6f12.5)',i,lonT(i,nj),xlonT(i),lonT(i,nj)+xlonT(i),latT(i,nj),xlatT(i),latT(i,nj)-xlatT(i)
+   print '(i5,6f12.5)',i,lonCt(i,nj),xlonCt(i),lonCt(i,nj)+xlonCt(i),latCt(i,nj),xlatCt(i),latCt(i,nj)-xlatCt(i)
   enddo
   print *
 
@@ -341,128 +330,23 @@ program gen_fixgrid
 ! fill grid vertices variables
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-  ! T and Cu grid share alignment in j
-  do j = 2,nj
-   do i = 1,ni
+  call fill_vertices(2,nj  , iVertCt,jVertCt, latBu,lonBu, latCt_vert,lonCt_vert)
+  call           fill_bottom(iVertCt,jVertCt, latBu,lonBu, latCt_vert,lonCt_vert)
 
-    do n = 1,nv
-      ii = i + iVertT(n); jj = j + jVertT(n)
-      if(ii .eq.    0)ii = ni
-      if(ii .eq. ni+1)ii = 1
-      latT_vert(i,j,n)   = latBu(ii,jj) 
-      lonT_vert(i,j,n)   = lonBu(ii,jj) 
-    enddo
+  call fill_vertices(2,nj  , iVertCu,jVertCu, latCv,lonCv, latCu_vert,lonCu_vert)
+  call           fill_bottom(iVertCu,jVertCu, latCv,lonCv, latCu_vert,lonCu_vert)
 
-    do n = 1,nv
-      ii = i + iVertCu(n); jj = j + jVertCu(n)
-      if(ii .eq.    0)ii = ni
-      if(ii .eq. ni+1)ii = 1
-      latCu_vert(i,j,n)  = latCv(ii,jj)  
-      lonCu_vert(i,j,n)  = lonCv(ii,jj)   
-    enddo
-   enddo
-  enddo
+  call fill_vertices(1,nj-1, iVertCv,jVertCv, latCu,lonCu, latCv_vert,lonCv_vert)
+  call              fill_top(iVertCv,jVertCv, latCu,lonCu, latCv_vert,lonCv_vert, xlatCu, xlonCu)
 
-  ! grid bottom (j=1) 
-  ! vertices 1,2 are available
-  ! vertices 3,4 must be set manually
-  j = 1
-  do i = 1,ni
-    do n = 1,2
-      ii = i + iVertT(n); jj = j + jVertT(n)
-      if(ii .eq.    0)ii = ni
-      if(ii .eq. ni+1)ii = 1
-      latT_vert(i,j,n)   = latBu(ii,jj)
-      lonT_vert(i,j,n)   = lonBu(ii,jj)
-    enddo
-      lonT_vert(i,j, 3) = lonT_vert(i,j,2)
-      lonT_vert(i,j, 4) = lonT_vert(i,j,1)
-      latT_vert(i,j, 3) = -90.0d0
-      latT_vert(i,j, 4) = -90.0d0
-
-    do n = 1,2
-      ii = i + iVertCu(n); jj = j + jVertCu(n)
-      if(ii .eq.    0)ii = ni
-      if(ii .eq. ni+1)ii = 1
-      latCu_vert(i,j,n)  = latCv(ii,jj)
-      lonCu_vert(i,j,n)  = lonCv(ii,jj)
-    enddo
-      lonCu_vert(i,j, 3) = lonCu_vert(i,j,2)
-      lonCu_vert(i,j, 4) = lonCu_vert(i,j,1)
-      latCu_vert(i,j, 3) = -90.0d0
-      latCu_vert(i,j, 4) = -90.0d0
-  enddo !i
-
-  ! Bu and Cv grid share alignment in j
-  do j = 1,nj-1
-   do i = 1,ni
-    do n = 1,nv
-      ii = i + iVertCv(n); jj = j + jVertCv(n)
-      if(ii .eq.    0)ii = ni
-      if(ii .eq. ni+1)ii = 1
-      latCv_vert(i,j,n)  = latCu(ii,jj)  
-      lonCv_vert(i,j,n)  = lonCu(ii,jj)   
-    enddo
-
-    do n = 1,nv
-      ii = i + iVertBu(n); jj = j + jVertBu(n)
-      if(ii .eq.    0)ii = ni
-      if(ii .eq. ni+1)ii = 1
-      latBu_vert(i,j,n)  =  latT(ii,jj)
-      lonBu_vert(i,j,n)  =  lonT(ii,jj)
-    enddo
-   enddo
-  enddo
-
-  !grid top (j=nj)
-  ! vertices 3,4 are available
-  ! vertices 1,2 must be set manually using 'across seam' values
-  j = nj
-  do i = 1,ni
-    do n = 3,4
-      ii = i + iVertCv(n); jj = j + jVertCv(n)
-      if(ii .eq.    0)ii = ni
-      if(ii .eq. ni+1)ii = 1
-      latCv_vert(i,j,n)  = latCu(ii,jj)
-      lonCv_vert(i,j,n)  = lonCu(ii,jj)
-    enddo
-    do n = 1,2
-      ii = i + iVertCv(n)
-      if(ii .eq.    0)ii = ni
-      if(ii .eq. ni+1)ii = 1
-      latCv_vert(i,j,n)  = xlatCu(ii)
-      lonCv_vert(i,j,n)  = xlonCu(ii)
-    enddo
-      !latCv_vert(i,j, 1) = latCv_vert(i,j,4)
-      !latCv_vert(i,j, 2) = latCv_vert(i,j,3)
-      !lonCv_vert(i,j, 1) = lonCv_vert(i,j,4)+240.d0
-      !lonCv_vert(i,j, 2) = lonCv_vert(i,j,3)+240.d0
-
-    do n = 3,4
-      ii = i + iVertBu(n); jj = j + jVertBu(n)
-      if(ii .eq.    0)ii = ni
-      if(ii .eq. ni+1)ii = 1
-      latBu_vert(i,j,n)  =  latT(ii,jj)
-      lonBu_vert(i,j,n)  =  lonT(ii,jj)
-    enddo
-    do n = 1,2
-      ii = i + iVertBu(n)
-      if(ii .eq.    0)ii = ni
-      if(ii .eq. ni+1)ii = 1
-      latBu_vert(i,j,n)  = xlatT(ii)
-      lonBu_vert(i,j,n)  = xlonT(ii)
-    enddo
-      !latBu_vert(i,j, 1) = latBu_vert(i,j,4)
-      !latBu_vert(i,j, 2) = latBu_vert(i,j,3)
-      !lonBu_vert(i,j, 1) = lonBu_vert(i,j,4)+240.d0
-      !lonBu_vert(i,j, 2) = lonBu_vert(i,j,3)+240.d0
-  enddo
-
-     i = 1
-  do j = 1,nj
-    if(lont_vert(i,j,1) .lt. 0.0)lont_vert(i,j,1) = lont_vert(i,j,1)+240.d0
-    if(lont_vert(i,j,4) .lt. 0.0)lont_vert(i,j,4) = lont_vert(i,j,4)+240.d0
-  enddo
+  call fill_vertices(1,nj-1, iVertBu,jVertBu, latCt,lonCt, latBu_vert,lonBu_vert)
+  call              fill_top(iVertBu,jVertBu, latCt,lonCt, latBu_vert,lonBu_vert, xlatCt, xlonCt)
+ 
+  !   i = 1
+  !do j = 1,nj
+  !  if(lont_vert(i,j,1) .lt. 0.0)lont_vert(i,j,1) = lont_vert(i,j,1)+240.d0
+  !  if(lont_vert(i,j,4) .lt. 0.0)lont_vert(i,j,4) = lont_vert(i,j,4)+240.d0
+  !enddo
 
   ! check
   i = 1; j = nj
@@ -488,13 +372,13 @@ program gen_fixgrid
   print *
 
   i = 1; j = 10
-  print '(f12.5,a,f12.5)',latT_vert(i,j,2),'        ',latT_vert(i,j,1)
-  print '(a12,f12.5)','          ',latT(i,j)
-  print '(f12.5,a,f12.5)',latT_vert(i,j,3),'        ',latT_vert(i,j,4)
+  print '(f12.5,a,f12.5)',latCt_vert(i,j,2),'        ',latCt_vert(i,j,1)
+  print '(a12,f12.5)','          ',latCt(i,j)
+  print '(f12.5,a,f12.5)',latCt_vert(i,j,3),'        ',latCt_vert(i,j,4)
   print *
-  print '(f12.5,a,f12.5)',lonT_vert(i,j,2),'        ',lonT_vert(i,j,1)
-  print '(a12,f12.5)','          ',lonT(i,j)
-  print '(f12.5,a,f12.5)',lonT_vert(i,j,3),'        ',lonT_vert(i,j,4)
+  print '(f12.5,a,f12.5)',lonCt_vert(i,j,2),'        ',lonCt_vert(i,j,1)
+  print '(a12,f12.5)','          ',lonCt(i,j)
+  print '(f12.5,a,f12.5)',lonCt_vert(i,j,3),'        ',lonCt_vert(i,j,4)
   print *
   print *
   ! check
@@ -506,17 +390,17 @@ program gen_fixgrid
   print '(a12,f12.5)','          ',lonCu(i,j)
   print '(f12.5,a,f12.5)',lonCu_vert(i,j,3),'        ',lonCu_vert(i,j,4)
 
-  !print *,minval(latT_vert),maxval(latT_vert)
-  !print *,minval(lonT_vert),maxval(lonT_vert)
-  !print *,minval(latBu_vert),maxval(latBu_vert)
-  !print *,minval(lonBu_vert),maxval(lonBu_vert)
-  !print *,minval(latCu_vert),maxval(latCu_vert)
-  !print *,minval(lonCu_vert),maxval(lonCu_vert)
-  !print *,minval(latCv_vert),maxval(latCv_vert)
-  !print *,minval(lonCv_vert),maxval(lonCv_vert)
+  print *,minval(latCt_vert),maxval(latCt_vert)
+  print *,minval(lonCt_vert),maxval(lonCt_vert)
+  print *,minval(latBu_vert),maxval(latBu_vert)
+  print *,minval(lonBu_vert),maxval(lonBu_vert)
+  print *,minval(latCu_vert),maxval(latCu_vert)
+  print *,minval(lonCu_vert),maxval(lonCu_vert)
+  print *,minval(latCv_vert),maxval(latCv_vert)
+  print *,minval(lonCv_vert),maxval(lonCv_vert)
 
-  if(minval( latT_vert) .lt. -1.e3)stop
-  if(minval( lonT_vert) .lt. -1.e3)stop
+  if(minval(latCt_vert) .lt. -1.e3)stop
+  if(minval(lonCt_vert) .lt. -1.e3)stop
   if(minval(latCu_vert) .lt. -1.e3)stop
   if(minval(lonCu_vert) .lt. -1.e3)stop
   if(minval(latCv_vert) .lt. -1.e3)stop
@@ -578,10 +462,10 @@ program gen_fixgrid
   rc = nf90_put_var(ncid,        id,     wet)
 
   rc = nf90_inq_varid(ncid,  'lonCt',     id)
-  rc = nf90_put_var(ncid,        id,    lonT)
+  rc = nf90_put_var(ncid,        id,   lonCt)
 
   rc = nf90_inq_varid(ncid,  'latCt',     id)
-  rc = nf90_put_var(ncid,        id,    latT)
+  rc = nf90_put_var(ncid,        id,   latCt)
 
   rc = nf90_inq_varid(ncid, 'lonCv',      id)
   rc = nf90_put_var(ncid,        id,   lonCv)
@@ -603,10 +487,10 @@ program gen_fixgrid
 
   ! vertices
   rc = nf90_inq_varid(ncid,  'lonCt_vert',     id)
-  rc = nf90_put_var(ncid,         id,   lonT_vert)
+  rc = nf90_put_var(ncid,         id,  lonCt_vert)
 
   rc = nf90_inq_varid(ncid,  'latCt_vert',     id)
-  rc = nf90_put_var(ncid,         id,   latT_vert)
+  rc = nf90_put_var(ncid,         id,  latCt_vert)
 
   rc = nf90_inq_varid(ncid, 'lonCv_vert',      id)
   rc = nf90_put_var(ncid,        id,   lonCv_vert)
@@ -627,5 +511,4 @@ program gen_fixgrid
   rc = nf90_put_var(ncid,        id,   latBu_vert)
 
   rc = nf90_close(ncid)
-
 end program gen_fixgrid

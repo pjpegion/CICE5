@@ -12,7 +12,6 @@ subroutine fill_vertices(jbeg,jend,iVert,jVert,lat,lon,latvert,lonvert)
 
   integer :: i,j,n,ii,jj
 
-
   do j = jbeg,jend
    do i = 1,ni
     do n = 1,nv
@@ -42,7 +41,7 @@ subroutine fill_bottom(iVert,jVert,lat,lon,latvert,lonvert)
   ! fill in grid bottom (j=1) 
   ! vertices 1,2 are available
   ! vertices 3,4 must be set manually
-     j = 1
+      j = 1
    do i = 1,ni
     do n = 1,2
       ii = i + iVert(n); jj = j + jVert(n)

@@ -192,10 +192,10 @@ program gen_fixgrid
    enddo
   enddo
 
-  where(lonCt .lt. 0.0)lonCt = lonCt + 360.d0
-  where(lonCu .lt. 0.0)lonCu = lonCu + 360.d0
-  where(lonCv .lt. 0.0)lonCv = lonCv + 360.d0
-  where(lonBu .lt. 0.0)lonBu = lonBu + 360.d0
+  !where(lonCt .lt. 0.0)lonCt = lonCt + 360.d0
+  !where(lonCu .lt. 0.0)lonCu = lonCu + 360.d0
+  !where(lonCv .lt. 0.0)lonCv = lonCv + 360.d0
+  !where(lonBu .lt. 0.0)lonBu = lonBu + 360.d0
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 ! some basic error checking
 ! find the i-th index of the poles at j= nj
@@ -330,12 +330,14 @@ program gen_fixgrid
 ! fill grid vertices variables
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
+  !Ct and Cu grids align in j 
   call fill_vertices(2,nj  , iVertCt,jVertCt, latBu,lonBu, latCt_vert,lonCt_vert)
   call           fill_bottom(iVertCt,jVertCt, latBu,lonBu, latCt_vert,lonCt_vert)
 
   call fill_vertices(2,nj  , iVertCu,jVertCu, latCv,lonCv, latCu_vert,lonCu_vert)
   call           fill_bottom(iVertCu,jVertCu, latCv,lonCv, latCu_vert,lonCu_vert)
 
+  !Cv and Bu grids align in j
   call fill_vertices(1,nj-1, iVertCv,jVertCv, latCu,lonCu, latCv_vert,lonCv_vert)
   call              fill_top(iVertCv,jVertCv, latCu,lonCu, latCv_vert,lonCv_vert, xlatCu, xlonCu)
 
@@ -390,14 +392,14 @@ program gen_fixgrid
   print '(a12,f12.5)','          ',lonCu(i,j)
   print '(f12.5,a,f12.5)',lonCu_vert(i,j,3),'        ',lonCu_vert(i,j,4)
 
-  print *,minval(latCt_vert),maxval(latCt_vert)
-  print *,minval(lonCt_vert),maxval(lonCt_vert)
-  print *,minval(latBu_vert),maxval(latBu_vert)
-  print *,minval(lonBu_vert),maxval(lonBu_vert)
-  print *,minval(latCu_vert),maxval(latCu_vert)
-  print *,minval(lonCu_vert),maxval(lonCu_vert)
-  print *,minval(latCv_vert),maxval(latCv_vert)
-  print *,minval(lonCv_vert),maxval(lonCv_vert)
+  !print *,minval(latCt_vert),maxval(latCt_vert)
+  !print *,minval(lonCt_vert),maxval(lonCt_vert)
+  !print *,minval(latBu_vert),maxval(latBu_vert)
+  !print *,minval(lonBu_vert),maxval(lonBu_vert)
+  !print *,minval(latCu_vert),maxval(latCu_vert)
+  !print *,minval(lonCu_vert),maxval(lonCu_vert)
+  !print *,minval(latCv_vert),maxval(latCv_vert)
+  !print *,minval(lonCv_vert),maxval(lonCv_vert)
 
   if(minval(latCt_vert) .lt. -1.e3)stop
   if(minval(lonCt_vert) .lt. -1.e3)stop

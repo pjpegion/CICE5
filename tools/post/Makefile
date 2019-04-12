@@ -19,5 +19,5 @@ gengrid: $(OBJS)
 	cpp $(optall) -I$(CDF)/include $*.F90>$*.i
 
 clean:
-	/bin/rm -f makeit *.o *.i *.mod
+	/bin/rm -f gengrid *.o *.i *.mod
 

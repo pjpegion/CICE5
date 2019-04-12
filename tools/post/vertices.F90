@@ -25,7 +25,7 @@ subroutine fill_vertices(jbeg,jend,iVert,jVert,lat,lon,latvert,lonvert)
   enddo
 end subroutine fill_vertices
  
-subroutine fill_bottom(iVert,jVert,lat,lon,latvert,lonvert)
+subroutine fill_bottom(iVert,jVert,lat,lon,latvert,lonvert,dlat)
 
   use param
 
@@ -33,6 +33,7 @@ subroutine fill_bottom(iVert,jVert,lat,lon,latvert,lonvert)
 
                             integer, intent( in) :: iVert(nv), jVert(nv)
   real(kind=8), dimension(ni,nj),    intent( in) ::  lat, lon
+  real(kind=8), dimension(ni),       intent( in) ::  dlat
 
   real(kind=8), dimension(ni,nj,nv), intent(out) :: latvert,lonvert
 
@@ -50,10 +51,14 @@ subroutine fill_bottom(iVert,jVert,lat,lon,latvert,lonvert)
       latvert(i,j,n)   = lat(ii,jj)
       lonvert(i,j,n)   = lon(ii,jj)
     enddo
+    do n = 3,4
+      ii = i + iVert(n)
+      if(ii .eq.    0)ii = ni
+      if(ii .eq. ni+1)ii = 1
+      latvert(i,j, n) =  dlat(ii)
+    enddo
       lonvert(i,j, 3) = lonvert(i,j,2)
       lonvert(i,j, 4) = lonvert(i,j,1)
-      latvert(i,j, 3) = -90.0d0
-      latvert(i,j, 4) = -90.0d0
    enddo
 end subroutine fill_bottom
 

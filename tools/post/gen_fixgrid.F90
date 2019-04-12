@@ -104,6 +104,8 @@ program gen_fixgrid
   ! need across seam values of Ct,Cu points to retrieve vertices of Bu and Cv grids
   real(kind=8), dimension(ni) :: xlonCt, xlatCt
   real(kind=8), dimension(ni) :: xlonCu, xlatCu
+  ! latitude spacing at bottom of grid
+  real(kind=8), dimension(ni) :: dlatBu, dlatCv
 
   character(len=256) :: fname_out, fname_in
   character(len=256) :: history
@@ -326,16 +328,22 @@ program gen_fixgrid
   enddo
   print *
 
+  !approx lat at grid bottom 
+  do i = 1,ni
+   dlatBu(i) = latBu(i,1) + 2.0*(latCu(i,1) - latBu(i,1))
+   dlatCv(i) = latCt(i,1) + 2.0*(latCt(i,1) - latCv(i,1))
+  enddo
+
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 ! fill grid vertices variables
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
   !Ct and Cu grids align in j 
   call fill_vertices(2,nj  , iVertCt,jVertCt, latBu,lonBu, latCt_vert,lonCt_vert)
-  call           fill_bottom(iVertCt,jVertCt, latBu,lonBu, latCt_vert,lonCt_vert)
+  call           fill_bottom(iVertCt,jVertCt, latBu,lonBu, latCt_vert,lonCt_vert,dlatBu)
 
   call fill_vertices(2,nj  , iVertCu,jVertCu, latCv,lonCv, latCu_vert,lonCu_vert)
-  call           fill_bottom(iVertCu,jVertCu, latCv,lonCv, latCu_vert,lonCu_vert)
+  call           fill_bottom(iVertCu,jVertCu, latCv,lonCv, latCu_vert,lonCu_vert,dlatCv)
 
   !Cv and Bu grids align in j
   call fill_vertices(1,nj-1, iVertCv,jVertCv, latCu,lonCu, latCv_vert,lonCv_vert)
@@ -392,14 +400,15 @@ program gen_fixgrid
   print '(a12,f12.5)','          ',lonCu(i,j)
   print '(f12.5,a,f12.5)',lonCu_vert(i,j,3),'        ',lonCu_vert(i,j,4)
 
+  print *,"latCt minmax ",minval(latCt),maxval(latCt)
+  print *,"latCu minmax ",minval(latCu),maxval(latCu)
+  print *,"latCv minmax ",minval(latCv),maxval(latCv)
+  print *,"latBu minmax ",minval(latBu),maxval(latBu)
+
   !print *,minval(latCt_vert),maxval(latCt_vert)
   !print *,minval(lonCt_vert),maxval(lonCt_vert)
   !print *,minval(latBu_vert),maxval(latBu_vert)
   !print *,minval(lonBu_vert),maxval(lonBu_vert)
-  !print *,minval(latCu_vert),maxval(latCu_vert)
-  !print *,minval(lonCu_vert),maxval(lonCu_vert)
-  !print *,minval(latCv_vert),maxval(latCv_vert)
-  !print *,minval(lonCv_vert),maxval(lonCv_vert)
 
   if(minval(latCt_vert) .lt. -1.e3)stop
   if(minval(lonCt_vert) .lt. -1.e3)stop
@@ -443,9 +452,9 @@ program gen_fixgrid
    rc = nf90_put_att(ncid, id,     'units', trim(fixgrid(ii)%unit_name))
    rc = nf90_put_att(ncid, id, 'long_name', trim(fixgrid(ii)%long_name))
    if(trim(fixgrid(ii)%var_name(1:3)) .eq. "lon")then
-    rc = nf90_put_att(ncid, id,  'lon_bnds', trim(fixgrid(ii)%vertices))
+    rc = nf90_put_att(ncid, id,  'lon_bounds', trim(fixgrid(ii)%vertices))
    else
-    rc = nf90_put_att(ncid, id,  'lat_bnds', trim(fixgrid(ii)%vertices))
+    rc = nf90_put_att(ncid, id,  'lat_bounds', trim(fixgrid(ii)%vertices))
    endif
   enddo
   dim3(3) = nv_dim

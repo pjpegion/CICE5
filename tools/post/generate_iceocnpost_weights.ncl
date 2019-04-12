@@ -113,14 +113,16 @@ begin
 ; used in the gen_weights call
 ;----------------------------------------------------------------------
 
+      gf = addfile(nemsrc+gridfile,"r")
+   do ii = 0,dimsizes(staggerlocs)-1
+
     Opt                   = True
     Opt@ForceOverwrite    = True
     Opt@PrintTimings      = True
-    Opt@Debug             = True
     Opt@InterpMethod      = "bilinear"
+    Opt@Debug             = True
+    Opt@Check             = True
 
-      gf = addfile(nemsrc+gridfile,"r")
-   do ii = 0,dimsizes(staggerlocs)-1
     print("working on stagger loc "+staggerlocs(ii))
           srcfile = nemsrc+staggerlocs(ii)+"_SCRIP.nc"
        srclonname = "lon"+staggerlocs(ii)
@@ -128,10 +130,19 @@ begin
     cornerlonname = "lon"+staggerlocs(ii)+"_vert"
     cornerlatname = "lat"+staggerlocs(ii)+"_vert"
 
-    Opt@GridCornerLon = gf->$cornerlonname$
-    Opt@GridCornerLat = gf->$cornerlatname$
+    if(staggerlocs(ii) .eq. "Ct")then
+     Opt@GridMask      = gf->wet
+     print("using grid mask wet")
+    end if
+     Opt@GridCornerLon = gf->$cornerlonname$
+     Opt@GridCornerLat = gf->$cornerlatname$
+     print("using locations "+srclatname+"  "+\
+                              srclonname+"  "+\
+                           cornerlatname+"  "+\
+                           cornerlonname)
 
-    curvilinear_to_SCRIP(srcfile, gf->$srclatname$, gf->$srclonname$, Opt) 
+    curvilinear_to_SCRIP(srcfile, gf->$srclatname$, gf->$srclonname$, Opt)
+    delete(Opt) 
    end do 
    ; close
    delete(gf)
@@ -143,13 +154,21 @@ begin
 
      dstfile = nemsrc+"Ct_SCRIP.nc"
     do ii = 1,dimsizes(staggerlocs)-1
+
+     Opt                   = True
+     Opt@ForceOverwrite    = True
+     Opt@PrintTimings      = True
+     Opt@InterpMethod      = "bilinear"
+     Opt@Debug             = True
+     Opt@Check             = True
+
      srcfile = nemsrc+staggerlocs(ii)+"_SCRIP.nc"
      ; this is the file containing the weights
      wgtfile = nemsrc+"tripole.mx025."+staggerlocs(ii)+".to.Ct.bilinear.nc"
 
      ESMF_regrid_gen_weights(srcfile,dstfile,wgtfile,Opt)
+     delete(Opt)
     end do
-    delete(Opt)
     ;close
     delete(dstfile)
     delete(srcfile)
@@ -173,30 +192,30 @@ begin
 ; for tripole Ct->latlon
 ;----------------------------------------------------------------------
 
-    Opt                   = True
-    Opt@ForceOverwrite    = True
-    Opt@PrintTimings      = True
-    Opt@Debug             = True
+    ;jj=0
+    jj=1
+    srcfile = nemsrc+"Ct_SCRIP.nc"
+    ;do jj = 0,dimsizes(methods)-1
+      Opt                   = True
+      Opt@ForceOverwrite    = True
+      Opt@PrintTimings      = True
+      Opt@InterpMethod      = methods(jj)
+      Opt@Debug             = True
+      Opt@Check             = True
 
-    ;ii = 2
-    do ii = 0,dimsizes(dstgrds)-1
-     Opt@LLCorner       = (/ -90.d,   0.d/)
-     Opt@URCorner       = (/  90.d, 360.d/)
+     ;ii = 2
+     do ii = 0,dimsizes(dstgrds)-1
+      Opt@LLCorner       = (/ -90.d,   0.d/)
+      Opt@URCorner       = (/  90.d, 360.d/)
     
-     dstfile = nemsrc+"latlon."+dstgrds(ii)+"_SCRIP.nc"
-     latlon_to_SCRIP(dstfile,dstres(ii),Opt)
-     
-     jj=1
-     srcfile = nemsrc+"Ct_SCRIP.nc"
-     ;do jj = 0,dimsizes(methods)-1
-       Opt@InterpMethod  = methods(jj)
-      ; this is the file containing the weights
+      dstfile = nemsrc+"latlon."+dstgrds(ii)+"_SCRIP.nc"
+      latlon_to_SCRIP(dstfile,dstres(ii),Opt)
+
       wgtfile = nemsrc+"tripole.mx025.Ct.to.latlon."+dstgrds(ii)+"."+methods(jj)+".nc"
       ESMF_regrid_gen_weights(srcfile,dstfile,wgtfile,Opt)
-      delete(Opt@InterpMethod)
-      delete(Opt@GridMask)
-     ;end do
-    end do
+      ;delete(Opt@GridMask)
+     end do
+    ;end do
 
    end if
 exit

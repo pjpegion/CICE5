@@ -71,6 +71,8 @@ program gen_fixgrid
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
   use param
+  use grdvar
+  use debugprint
   use fixgriddefs
   use netcdf
 
@@ -83,30 +85,6 @@ program gen_fixgrid
   ! super-grid source variables
   real(kind=8), dimension(0:nx,0:ny)   :: x, y
 
-  ! land mask
-  integer(kind=4), dimension(ni,nj) :: wet
-
-  ! grid stagger locations
-  real(kind=8), dimension(ni,nj) :: latCt, lonCt ! lat and lon of T on C-grid
-  real(kind=8), dimension(ni,nj) :: latCv, lonCv ! lat and lon of V on C-grid
-  real(kind=8), dimension(ni,nj) :: latCu, lonCu ! lat and lon of U on C-grid
-  real(kind=8), dimension(ni,nj) :: latBu, lonBu ! lat and lon of corners on C-grid
-
-  ! vertices of each stagger location
-  real(kind=8), dimension(ni,nj,nv) :: latCt_vert, lonCt_vert
-  real(kind=8), dimension(ni,nj,nv) :: latCu_vert, lonCu_vert
-  real(kind=8), dimension(ni,nj,nv) :: latCv_vert, lonCv_vert
-  real(kind=8), dimension(ni,nj,nv) :: latBu_vert, lonBu_vert
-
-  integer, dimension(nv) :: iVertBu, iVertCu, iVertCv
-  integer, dimension(nv) :: jVertBu, jVertCu, jVertCv 
-
-  ! need across seam values of Ct,Cu points to retrieve vertices of Bu and Cv grids
-  real(kind=8), dimension(ni) :: xlonCt, xlatCt
-  real(kind=8), dimension(ni) :: xlonCu, xlatCu
-  ! latitude spacing at bottom of grid
-  real(kind=8), dimension(ni) :: dlatBu, dlatCv
-
   character(len=256) :: fname_out, fname_in
   character(len=256) :: history
   character(len=  8) :: cdate
@@ -114,8 +92,7 @@ program gen_fixgrid
   integer :: rc,ncid
   integer :: id, dim2(2), dim3(3)
   integer :: ni_dim,nj_dim,nv_dim
-  integer :: i,j,n,ii,jj,i2,j2,ip1,im1
-  integer :: ipole(2),i1
+  integer :: i,j,n,ii,jj,i2,j2
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 ! set up the arrays to retrieve the vertices
@@ -194,10 +171,10 @@ program gen_fixgrid
    enddo
   enddo
 
-  !where(lonCt .lt. 0.0)lonCt = lonCt + 360.d0
-  !where(lonCu .lt. 0.0)lonCu = lonCu + 360.d0
-  !where(lonCv .lt. 0.0)lonCv = lonCv + 360.d0
-  !where(lonBu .lt. 0.0)lonBu = lonBu + 360.d0
+  where(lonCt .lt. 0.0)lonCt = lonCt + 360.d0
+  where(lonCu .lt. 0.0)lonCu = lonCu + 360.d0
+  where(lonCv .lt. 0.0)lonCv = lonCv + 360.d0
+  where(lonBu .lt. 0.0)lonBu = lonBu + 360.d0
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 ! some basic error checking
 ! find the i-th index of the poles at j= nj
@@ -214,44 +191,7 @@ program gen_fixgrid
   enddo
   print *,'poles found at ',ipole,latBu(ipole(1),nj),latBu(ipole(2),nj)
 
-  j = nj
-  i1 = ipole(1); i2 = ipole(2)+1
-  print *,'latCu across seam '
-  print *,latCu(i1-3,j),latCu(i2+2,j),latCu(i1-3,j)-latCu(i2+2,j)
-  print *,latCu(i1-2,j),latCu(i2+1,j)
-  print *,latCu(i1-1,j),latCu(i2+0,j)
-  print *,latCu(i1,  j),latCu(i2-1,j)
-  print *,latCu(i1+1,j),latCu(i2-2,j)
-  print *,latCu(i1+2,j),latCu(i2-3,j)
-  print *,latCu(i1+3,j),latCu(i2-4,j)
-
-  print *,'lonCu across seam '
-  print *,lonCu(i1-3,j),lonCu(i2+2,j),lonCu(i1-3,j)+lonCu(i2+2,j)
-  print *,lonCu(i1-2,j),lonCu(i2+1,j)
-  print *,lonCu(i1-1,j),lonCu(i2+0,j)
-  print *,lonCu(i1,  j),lonCu(i2-1,j)
-  print *,lonCu(i1+1,j),lonCu(i2-2,j)
-  print *,lonCu(i1+2,j),lonCu(i2-3,j)
-  print *,lonCu(i1+3,j),lonCu(i2-4,j)
-
-  print *,'latCt across seam '
-  print *,latCt(i1-3,j),latCt(i2+3,j),latCt(i1-3,j)-latCt(i2+3,j)
-  print *,latCt(i1-2,j),latCt(i2+2,j)
-  print *,latCt(i1-1,j),latCt(i2+1,j)
-  print *,latCt(i1,  j),latCt(i2,  j)
-  print *,latCt(i1+1,j),latCt(i2-1,j)
-  print *,latCt(i1+2,j),latCt(i2-2,j)
-  print *,latCt(i1+3,j),latCt(i2-3,j)
-
-  print *,'lonCt across seam '
-  print *,lonCt(i1-3,j),lonCt(i2+3,j),lonCt(i1-3,j)+lonCt(i2+3,j)
-  print *,lonCt(i1-2,j),lonCt(i2+2,j)
-  print *,lonCt(i1-1,j),lonCt(i2+1,j)
-  print *,lonCt(i1,  j),lonCt(i2,  j)
-  print *,lonCt(i1+1,j),lonCt(i2-1,j)
-  print *,lonCt(i1+2,j),lonCt(i2-2,j)
-  print *,lonCt(i1+3,j),lonCt(i2-3,j)
-  print *
+  call checkseam
 
   do i = 1,ni
     i2 = ipole(2)+(ipole(1)-i)+1
@@ -274,59 +214,16 @@ program gen_fixgrid
     if(i2 .lt. 1)i2 = ni
    xlonCu(i) = lonCu(i2,nj)
    xlatCu(i) = latCu(i2,nj)
+   !print *,i,xlonCu(i),lonCu(i2,nj)
   enddo
  
- 
-  print *,'============== Ct grid ==============='
-  print *,'============== Left pole ============'
-  do i = ipole(1)-3,ipole(1)+3
-   print '(i5,6f12.5)',i,lonCt(i,nj),xlonCt(i),lonCt(i,nj)+xlonCt(i),latCt(i,nj),xlatCt(i),latCt(i,nj)-xlatCt(i)
-  enddo
-  print *
-
-  print *,'============ Right pole ============'
-  do i = ipole(2)-3,ipole(2)+3
-   print '(i5,6f12.5)',i,lonCt(i,nj),xlonCt(i),lonCt(i,nj)+xlonCt(i),latCt(i,nj),xlatCt(i),latCt(i,nj)-xlatCt(i)
-  enddo
-  print *
-
-  print *,'============== Ct grid ==============='
-  print *,'============== Left edge ============'
-  do i = 1,5
-   print '(i5,6f12.5)',i,lonCt(i,nj),xlonCt(i),lonCt(i,nj)+xlonCt(i),latCt(i,nj),xlatCt(i),latCt(i,nj)-xlatCt(i)
-  enddo
-  print *
-  print *,'============== Right edge ==========='
-  do i = ni-4,ni
-   print '(i5,6f12.5)',i,lonCt(i,nj),xlonCt(i),lonCt(i,nj)+xlonCt(i),latCt(i,nj),xlatCt(i),latCt(i,nj)-xlatCt(i)
-  enddo
-  print *
-
-
-  print *,'============== Cu grid ==============='
-  print *,'============== Left pole ============='
-  do i = ipole(1)-3,ipole(1)+3
-   print '(i5,6f12.5)',i,lonCu(i,nj),xlonCu(i),lonCu(i,nj)+xlonCu(i),latCu(i,nj),xlatCu(i),latCu(i,nj)-xlatCu(i)
-  enddo
-  print *
-
-  print *,'============ Right pole ============'
-  do i = ipole(2)-3,ipole(2)+3
-   print '(i5,6f12.5)',i,lonCu(i,nj),xlonCu(i),lonCu(i,nj)+xlonCu(i),latCu(i,nj),xlatCu(i),latCu(i,nj)-xlatCu(i)
-  enddo
-  print *
-
-  print *,'============== Cu grid ==============='
-  print *,'============== Left edge ============'
-  do i = 1,5
-   print '(i5,6f12.5)',i,lonCu(i,nj),xlonCu(i),lonCu(i,nj)+xlonCu(i),latCu(i,nj),xlatCu(i),latCu(i,nj)-xlatCu(i)
-  enddo
-  print *
-  print *,'============== Right edge ==========='
-  do i = ni-4,ni
-   print '(i5,6f12.5)',i,lonCu(i,nj),xlonCu(i),lonCu(i,nj)+xlonCu(i),latCu(i,nj),xlatCu(i),latCu(i,nj)-xlatCu(i)
-  enddo
-  print *
+  !xlonCu(ni) = xlonCu(ni) - 360.d0 
+  call checkxlatlon
+  !do i = 1,ni
+  !  i2 = ipole(2)+(ipole(1)-i)
+  !  if(i2 .lt. 1)i2 = ni
+  ! print *,i,xlonCu(i),lonCu(i2,nj)
+  !enddo
 
   !approx lat at grid bottom 
   do i = 1,ni
@@ -358,57 +255,7 @@ program gen_fixgrid
   !  if(lont_vert(i,j,4) .lt. 0.0)lont_vert(i,j,4) = lont_vert(i,j,4)+240.d0
   !enddo
 
-  ! check
-  i = 1; j = nj
-  print '(f12.5,a,f12.5)',latBu_vert(i,j,2),'        ',latBu_vert(i,j,1)
-  print '(a12,f12.5)','          ',latBu(i,j)
-  print '(f12.5,a,f12.5)',latBu_vert(i,j,3),'        ',latBu_vert(i,j,4)
-  print *
-  print '(f12.5,a,f12.5)',lonBu_vert(i,j,2),'        ',lonBu_vert(i,j,1)
-  print '(a12,f12.5)','          ',lonBu(i,j)
-  print '(f12.5,a,f12.5)',lonBu_vert(i,j,3),'        ',lonBu_vert(i,j,4)
-  print *
-  print *
-  ! check
-  print '(f12.5,a,f12.5)',latCv_vert(i,j,2),'        ',latCv_vert(i,j,1)
-  print '(a12,f12.5)','          ',latCv(i,j)
-  print '(f12.5,a,f12.5)',latCv_vert(i,j,3),'        ',latCv_vert(i,j,4)
-  print *
-  print '(f12.5,a,f12.5)',lonCv_vert(i,j,2),'        ',lonCv_vert(i,j,1)
-  print '(a12,f12.5)','          ',lonCv(i,j)
-  print '(f12.5,a,f12.5)',lonCv_vert(i,j,3),'        ',lonCv_vert(i,j,4)
-
-  print *
-  print *
-
-  i = 1; j = 10
-  print '(f12.5,a,f12.5)',latCt_vert(i,j,2),'        ',latCt_vert(i,j,1)
-  print '(a12,f12.5)','          ',latCt(i,j)
-  print '(f12.5,a,f12.5)',latCt_vert(i,j,3),'        ',latCt_vert(i,j,4)
-  print *
-  print '(f12.5,a,f12.5)',lonCt_vert(i,j,2),'        ',lonCt_vert(i,j,1)
-  print '(a12,f12.5)','          ',lonCt(i,j)
-  print '(f12.5,a,f12.5)',lonCt_vert(i,j,3),'        ',lonCt_vert(i,j,4)
-  print *
-  print *
-  ! check
-  print '(f12.5,a,f12.5)',latCu_vert(i,j,2),'        ',latCu_vert(i,j,1)
-  print '(a12,f12.5)','          ',latCu(i,j)
-  print '(f12.5,a,f12.5)',latCu_vert(i,j,3),'        ',latCu_vert(i,j,4)
-  print *
-  print '(f12.5,a,f12.5)',lonCu_vert(i,j,2),'        ',lonCu_vert(i,j,1)
-  print '(a12,f12.5)','          ',lonCu(i,j)
-  print '(f12.5,a,f12.5)',lonCu_vert(i,j,3),'        ',lonCu_vert(i,j,4)
-
-  print *,"latCt minmax ",minval(latCt),maxval(latCt)
-  print *,"latCu minmax ",minval(latCu),maxval(latCu)
-  print *,"latCv minmax ",minval(latCv),maxval(latCv)
-  print *,"latBu minmax ",minval(latBu),maxval(latBu)
-
-  !print *,minval(latCt_vert),maxval(latCt_vert)
-  !print *,minval(lonCt_vert),maxval(lonCt_vert)
-  !print *,minval(latBu_vert),maxval(latBu_vert)
-  !print *,minval(lonBu_vert),maxval(lonBu_vert)
+  call checkpoint
 
   if(minval(latCt_vert) .lt. -1.e3)stop
   if(minval(lonCt_vert) .lt. -1.e3)stop

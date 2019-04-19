@@ -9,7 +9,7 @@ FOPT = -C
 ######################################################################
 # 
 #####################################################################
-OBJS = param.o fixgriddefs.o gen_fixgrid.o vertices.o
+OBJS = param.o grdvar.o debugprint.o fixgriddefs.o gen_fixgrid.o vertices.o
 
 gengrid: $(OBJS)
 	$(F90) $(FOPT) -o gengrid $(OBJS) -L$(CDF)/lib -lnetcdff -lnetcdf 

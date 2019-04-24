@@ -26,24 +26,24 @@ begin
 ;---Destination grid sizes and name
        dstgrds     = (/    "0p25",     "0p5",  "1p0"/)
        dstres      = (/ "0.25deg",  "0.5deg", "1deg"/)
-        dstxdim    = (/      1440,       720,   360/)
-        dstydim    = (/       720,       360,   180/)
+       ; dstxdim    = (/      1440,       720,   360/)
+       ; dstydim    = (/       720,       360,   180/)
 
 ;---The variables to be regridded with the native tripole stagger location
 ;---and dimensionality 
 
-   varlist = (/ (/ "SSH", "Ct", "bilinear"/) \
-               ,(/ "SST", "Ct", "bilinear"/) \
-               ,(/ "SSS", "Ct", "bilinear"/) \
-               ,(/"temp", "Ct", "bilinear"/) \
-               ,(/  "so", "Ct", "bilinear"/) \
+   varlist = (/ (/ "SSH", "Ct", "bilinear", "2"/) \
+               ,(/ "SST", "Ct", "bilinear", "2"/) \
+               ,(/ "SSS", "Ct", "bilinear", "2"/) \
+               ,(/"temp", "Ct", "bilinear", "3"/) \
+               ,(/  "so", "Ct", "bilinear", "3"/) \
              /)
    print(varlist)
 
    nvpairs = 2
-   veclist = new( (/nvpairs,3,2/),"string")
-   veclist = (/ (/ (/"SSU", "SSV"/), (/"Cu", "Cv"/), (/"bilinear", "bilinear"/) /) ,\
-                (/ (/ "uo",  "vo"/), (/"Cu", "Cv"/), (/"bilinear", "bilinear"/) /)  \
+   veclist = new( (/nvpairs,4,2/),"string")
+   veclist = (/ (/ (/"SSU", "SSV"/), (/"Cu", "Cv"/), (/"bilinear", "bilinear"/), (/"2", "2"/) /) ,\
+                (/ (/ "uo",  "vo"/), (/"Cu", "Cv"/), (/"bilinear", "bilinear"/), (/"3", "3"/) /)  \
              /)
    print(veclist)
 
@@ -61,9 +61,12 @@ begin
           ocnf = addfiles(ocnfilelist,"r")
         nfiles = dimsizes(ocnfilelist)
 
-  ; get the rotation angles from the first file
+  ; get the rotation angles and vertical grid from the first file
     sinrot = ocnf[0]->sinrot
     cosrot = ocnf[0]->cosrot
+       z_l = ocnf[0]->z_l
+       z_i = ocnf[0]->z_i
+     nlevs = dimsizes(z_l)
 
 ;----------------------------------------------------------------------
 ; loop over the output resolutions for each file 
@@ -76,8 +79,103 @@ begin
     outres = "_"+dstgrds(jj)+"x"+dstgrds(jj)+"_MOM6"
    ;do ii = 0,nfiles-1
      infile = ocnfilelist(ii)
-    outfile = create_outfile_name(infile,outres,dstgrds(jj))
+    ;outfile = create_outfile_name(infile,outres,dstgrds(jj))
+    outfile = "test.nc"
+       time = ocnf[0]->time
+    delete(time@bounds)
+
+   ; regrid a field to obtain the output xy dimensions
+    wgtsfile = nemsrc+"tripole.mx025.Ct.to.latlon.0p25.bilinear.nc"
+          tt = ESMF_regrid_with_weights(sinrot,wgtsfile,False)
+        tt!0 = "lat"
+        tt!1 = "lon"
+         lat = tt&lat
+         lon = tt&lon
+        dims = dimsizes(tt)
+        nlat = dims(0)
+        nlon = dims(1)
+     print("fields will be remapped to destination grid size "\
+           +nlon+"  "+nlat)
+     
+     delete(tt)
+     delete(dims)
+
+;----------------------------------------------------------------------
+; set up the output netcdf file
+;----------------------------------------------------------------------
  
+    system("/bin/rm -f " + outfile)    ; remove if exists
+    outcdf  = addfile (outfile, "c")  ; open output file
+
+    ; explicitly declare file definition mode. Improve efficiency.
+    setfileoption(outcdf,"DefineMode",True)
+
+    ; create global attributes of the file
+    fAtt               = True            ; assign file attributes
+    fAtt@creation_date = systemfunc ("date")        
+    fileattdef( outcdf, fAtt )           ; copy file attributes    
+
+    ; predefine the coordinate variables and their dimensionality
+    dimNames = (/"time", "z_l",   "z_i", "lat", "lon"/)  
+    dimSizes = (/ -1   , nlevs, nlevs+1,  nlat,  nlon/) 
+    dimUnlim = (/ True , False,   False, False, False/)   
+    filedimdef(outcdf,dimNames,dimSizes,dimUnlim)
+
+    ; predefine the the dimensionality of the variables to be written out
+    filevardef(outcdf, "time", typeof(time), getvardims(time)) 
+    filevardef(outcdf,  "z_l",  typeof(z_l),  getvardims(z_l))                           
+    filevardef(outcdf,  "z_i",  typeof(z_i),  getvardims(z_i))                           
+    filevardef(outcdf,  "lat",  typeof(lat),  getvardims(lat))                          
+    filevardef(outcdf,  "lon",  typeof(lon),  getvardims(lon))                          
+
+    ; Copy attributes associated with each variable to the file
+    filevarattdef(outcdf, "time", time)                 
+    filevarattdef(outcdf,  "z_l",  z_l)               
+    filevarattdef(outcdf,  "z_i",  z_i)               
+    filevarattdef(outcdf,  "lat",  lat)             
+    filevarattdef(outcdf,  "lon",  lon)            
+
+    do nv = 0,nvars-1
+     varname = varlist(nv,0)
+     vardims = varlist(nv,3)
+     if(vardims .eq. "2")then
+      odims = (/"time", "lat", "lon"/)
+     else
+      odims = (/"time", "z_l", "lat", "lon"/)
+     end if
+     filevardef(outcdf, varname, "float", odims)
+     delete(odims)
+    end do
+
+    do nv = 0,nvpairs-1
+     do nn = 0,1
+     vecname = veclist(nv,0,nn)
+     vecdims = veclist(nv,3,nn)
+     if(vecdims .eq. "2")then
+      odims = (/"time", "lat", "lon"/)
+     else
+      odims = (/"time", "z_l", "lat", "lon"/)
+     end if
+     filevardef(outcdf, vecname, "float", odims) 
+     delete(odims)
+     end do
+    end do
+ 
+    ; explicitly exit file definition mode. **NOT REQUIRED**
+    setfileoption(outcdf,"DefineMode",False)
+
+    outcdf->time   = (/time/)     
+    outcdf->z_l    = (/z_l/)     
+    outcdf->z_i    = (/z_i/)     
+    outcdf->lat    = (/lat/)
+    outcdf->lon    = (/lon/) 
+
+    delete(outcdf)
+;----------------------------------------------------------------------
+;
+;----------------------------------------------------------------------
+
+if(1 .eq. 0)then
 ;----------------------------------------------------------------------
 ;
 ;----------------------------------------------------------------------
@@ -142,6 +240,7 @@ begin
     filedimdef(df,"time",-1,True)   ; make time an UNLIMITED dimension
     time = ocnf[ii]->time
     df->sss = rgtt
+end if   
  
 if(1.eq.0)then
 ;----------------------------------------------------------------------

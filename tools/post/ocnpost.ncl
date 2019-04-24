@@ -68,6 +68,10 @@ begin
        z_i = ocnf[0]->z_i
      nlevs = dimsizes(z_l)
 
+  ; get a 2 and 3 dimensional fields for creating the interpolation masks
+  Ctmask2d = where(ismissing(ocnf[0]->SST),  1.0, 0.0)
+  Ctmask3d = where(ismissing(ocnf[0]->temp), 1.0, 0.0)
+
 ;----------------------------------------------------------------------
 ; loop over the output resolutions for each file 
 ;----------------------------------------------------------------------
@@ -170,12 +174,11 @@ begin
     outcdf->lat    = (/lat/)
     outcdf->lon    = (/lon/) 
 
-    delete(outcdf)
 ;----------------------------------------------------------------------
 ;
 ;----------------------------------------------------------------------
 
-if(1 .eq. 0)then
+;if(1 .eq. 0)then
 ;----------------------------------------------------------------------
 ;
 ;----------------------------------------------------------------------
@@ -222,6 +225,8 @@ if(1 .eq. 0)then
       end do
      end if
 
+    outcdf->varname   = (/rgtt/)     
+
      ;if(ndims .eq. 3)then
      ;  tmask = where(ismissing(ocnf[ii]->SSS),1.0,0.0)
      ;   rgtt = regrid_and_mask(tmask,tt,wgtsfile)
@@ -236,11 +241,7 @@ if(1 .eq. 0)then
     ; nv
     ;end do
    
-    df = addfile("test.nc","c")
-    filedimdef(df,"time",-1,True)   ; make time an UNLIMITED dimension
-    time = ocnf[ii]->time
-    df->sss = rgtt
-end if   
+;end if   
  
 if(1.eq.0)then
 ;----------------------------------------------------------------------

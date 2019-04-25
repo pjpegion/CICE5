@@ -96,17 +96,31 @@ load "$NCARG_ROOT/lib/ncarg/nclscripts/esmf/ESMF_regridding.ncl"
 begin
 
     generate_unstagger_weights = False
+    generate_dstgrid_SCRIP_files = True
     generate_tripole_latlon_weights = True
 
 ;---Specify a location to use
         nemsrc     = "/scratch4/NCEPDEV/ocean/save/Denise.Worthen/NEMS_INPUT0.1/ocnicepost/"
 ;---Interpolation methods
     methods        = (/"bilinear" ,"conserve"/)
-;---Source tripole grid location 
+
+;---Source tripole grid  
             srcloc = nemsrc
           gridfile = "tripole.mx025.nc"
        staggerlocs = (/"Ct", "Cu", "Cv", "Bu"/)
- 
+
+;---Destintion grids 
+       dstgrds     = (/    "0p25",     "0p5",  "1p0"/)
+       dstres      = (/ "0.25deg",  "0.5deg", "1deg"/)
+
+       dstlonbeg   = (/  0.125,    0.25,   0.50/)
+       dstlonend   = (/359.875,  359.75, 359.50/)
+       dstlatbeg   = (/-89.875,  -89.75, -89.50/)
+       dstlatend   = (/ 89.875,   89.75,  89.50/)
+
+        dstxdim    = (/1440,    720,   360/)
+        dstydim    = (/ 720,    360,   180/)
+
    if(generate_unstagger_weights)then
 ;----------------------------------------------------------------------
 ; for each stagger grid, first generate SCRIP grid files which will be
@@ -144,6 +158,34 @@ begin
     curvilinear_to_SCRIP(srcfile, gf->$srclatname$, gf->$srclonname$, Opt)
     delete(Opt) 
    end do 
+
+    ; generate a Ct SCRIP file with no masking, this is for generating the
+    ; interpolation mask at different vertical ocean model levels
+    Opt                   = True
+    Opt@ForceOverwrite    = True
+    Opt@PrintTimings      = True
+    Opt@InterpMethod      = "bilinear"
+    Opt@Debug             = True
+    Opt@Check             = True
+
+    ii = 0
+    print("working on stagger loc "+staggerlocs(ii))
+          srcfile = nemsrc+staggerlocs(ii)+"_SCRIP_nomask.nc"
+       srclonname = "lon"+staggerlocs(ii)
+       srclatname = "lat"+staggerlocs(ii)
+    cornerlonname = "lon"+staggerlocs(ii)+"_vert"
+    cornerlatname = "lat"+staggerlocs(ii)+"_vert"
+
+     Opt@GridCornerLon = gf->$cornerlonname$
+     Opt@GridCornerLat = gf->$cornerlatname$
+     print("using locations "+srclatname+"  "+\
+                              srclonname+"  "+\
+                           cornerlatname+"  "+\
+                           cornerlonname)
+
+    curvilinear_to_SCRIP(srcfile, gf->$srclatname$, gf->$srclonname$, Opt)
+    delete(Opt)
+
    ; close
    delete(gf)
 
@@ -152,7 +194,7 @@ begin
 ; bilinear
 ;----------------------------------------------------------------------
 
-     dstfile = nemsrc+"Ct_SCRIP.nc"
+     dstfile = nemsrc+"Ct_SCRIP_nomask.nc"
     do ii = 1,dimsizes(staggerlocs)-1
 
      Opt                   = True
@@ -175,16 +217,45 @@ begin
     delete(wgtfile)
    end if
 
+   if(generate_dstgrid_SCRIP_files)then
 ;----------------------------------------------------------------------
-; Generate the weights to regrid from tripole Ct to latlon using
-; bilinear and conservative regridding
+;
 ;----------------------------------------------------------------------
 
-;---Destination grid and weights location
-            dstloc = nemsrc
-;---Destination grid sizes and name
-       dstgrds     = (/    "0p25",     "0p5",  "1p0"/)
-       dstres      = (/ "0.25deg",  "0.5deg", "1deg"/)
+     do ii = 0,dimsizes(dstgrds)-1
+
+     ; rectilinear destination
+     Opt                   = True
+     Opt@ForceOverwrite    = True
+     Opt@PrintTimings      = True
+     Opt@Debug             = True
+     Opt@Check             = True
+
+     lons = fspan(dstlonbeg(ii),dstlonend(ii),dstxdim(ii))
+     lats = fspan(dstlatbeg(ii),dstlatend(ii),dstydim(ii))
+     ;print(dimsizes(lons))
+     ;print(dimsizes(lats))
+     Opt@LLCorner          = (/ -90.d,   0.d/)
+     Opt@URCorner          = (/  90.d, 360.d/)
+
+     Opt@DstGridLat = lats
+     Opt@DstGridLon = lons
+  
+     dstfile = nemsrc+"rect."+dstgrds(ii)+"_SCRIP.nc"
+     print("generating dstfile "+dstfile)
+     rectilinear_to_SCRIP(dstfile,lats,lons,Opt)
+
+     delete(lats)
+     delete(lons)
+
+     ; latlon destination
+     dstfile = nemsrc+"latlon."+dstgrds(ii)+"_SCRIP.nc"
+     print("generating dstfile "+dstfile)
+     latlon_to_SCRIP(dstfile,dstres(ii),Opt)
+
+     delete(Opt)
+    end do
+   end if
 
    if(generate_tripole_latlon_weights)then
 ;----------------------------------------------------------------------
@@ -192,8 +263,8 @@ begin
 ; for tripole Ct->latlon
 ;----------------------------------------------------------------------
 
-    ;jj=0
-    jj=1
+    jj=0
+    ;jj=1
     srcfile = nemsrc+"Ct_SCRIP.nc"
     ;do jj = 0,dimsizes(methods)-1
       Opt                   = True
@@ -203,18 +274,37 @@ begin
       Opt@Debug             = True
       Opt@Check             = True
 
-     ;ii = 2
-     do ii = 0,dimsizes(dstgrds)-1
-      Opt@LLCorner       = (/ -90.d,   0.d/)
-      Opt@URCorner       = (/  90.d, 360.d/)
+     ii = 2
+     ;do ii = 0,dimsizes(dstgrds)-1
     
       dstfile = nemsrc+"latlon."+dstgrds(ii)+"_SCRIP.nc"
-      latlon_to_SCRIP(dstfile,dstres(ii),Opt)
-
+      ;this file contains the weights
       wgtfile = nemsrc+"tripole.mx025.Ct.to.latlon."+dstgrds(ii)+"."+methods(jj)+".nc"
       ESMF_regrid_gen_weights(srcfile,dstfile,wgtfile,Opt)
+
+      dstfile = nemsrc+"rect."+dstgrds(ii)+"_SCRIP.nc"
+      ;this file contains the weights
+      wgtfile = nemsrc+"tripole.mx025.Ct.to.rect."+dstgrds(ii)+"."+methods(jj)+".nc"
+      ESMF_regrid_gen_weights(srcfile,dstfile,wgtfile,Opt)
       ;delete(Opt@GridMask)
-     end do
+     ;end do
+
+     srcfile = nemsrc+"Ct_SCRIP_nomask.nc"
+     ii = 2
+     ;do ii = 0,dimsizes(dstgrds)-1
+
+      dstfile = nemsrc+"latlon."+dstgrds(ii)+"_SCRIP.nc"
+      ;this file contains the weights
+      wgtfile = nemsrc+"tripole.mx025.Ct.to.latlon."+dstgrds(ii)+"."+methods(jj)+"_nomask.nc"
+      ESMF_regrid_gen_weights(srcfile,dstfile,wgtfile,Opt)
+
+      dstfile = nemsrc+"rect."+dstgrds(ii)+"_SCRIP.nc"
+      ;this file contains the weights
+      wgtfile = nemsrc+"tripole.mx025.Ct.to.rect."+dstgrds(ii)+"."+methods(jj)+"_nomask.nc"
+      ESMF_regrid_gen_weights(srcfile,dstfile,wgtfile,Opt)
+      ;delete(Opt@GridMask)
+     ;end do
+
     ;end do
 
    end if

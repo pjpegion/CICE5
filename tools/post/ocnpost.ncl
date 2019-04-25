@@ -16,6 +16,8 @@
 ;----------------------------------------------------------------------
 begin
 
+    output_masks = True
+
 ;---Specify a location to use
         nemsrc     = "/scratch4/NCEPDEV/ocean/save/Denise.Worthen/NEMS_INPUT0.1/ocnicepost/"
 ;---Interpolation methods
@@ -24,10 +26,8 @@ begin
             dirsrc = "/scratch3/NCEPDEV/stmp2/Denise.Worthen/BM1_ocn/"
 
 ;---Destination grid sizes and name
-       dstgrds     = (/    "0p25",     "0p5",  "1p0"/)
-       dstres      = (/ "0.25deg",  "0.5deg", "1deg"/)
-       ; dstxdim    = (/      1440,       720,   360/)
-       ; dstydim    = (/       720,       360,   180/)
+       dsttype     = (/"rect."/)
+       dstgrds     = (/"0p25", "0p5", "1p0"/)
 
 ;---The variables to be regridded with the native tripole stagger location
 ;---and dimensionality 
@@ -38,14 +38,14 @@ begin
                ,(/"temp", "Ct", "bilinear", "3"/) \
                ,(/  "so", "Ct", "bilinear", "3"/) \
              /)
-   print(varlist)
+   ;print(varlist)
 
    nvpairs = 2
    veclist = new( (/nvpairs,4,2/),"string")
    veclist = (/ (/ (/"SSU", "SSV"/), (/"Cu", "Cv"/), (/"bilinear", "bilinear"/), (/"2", "2"/) /) ,\
                 (/ (/ "uo",  "vo"/), (/"Cu", "Cv"/), (/"bilinear", "bilinear"/), (/"3", "3"/) /)  \
              /)
-   print(veclist)
+   ;print(veclist)
 
      dims = dimsizes(varlist)
     nvars = dims(0)
@@ -69,27 +69,21 @@ begin
      nlevs = dimsizes(z_l)
 
   ; get a 2 and 3 dimensional fields for creating the interpolation masks
-  Ctmask2d = where(ismissing(ocnf[0]->SST),  1.0, 0.0)
-  Ctmask3d = where(ismissing(ocnf[0]->temp), 1.0, 0.0)
+  mask2d = where(ismissing(ocnf[0]->SST),  1.0, 0.0)
+  mask3d = where(ismissing(ocnf[0]->temp), 1.0, 0.0)
 
 ;----------------------------------------------------------------------
-; loop over the output resolutions for each file 
+; loop over the output resolutions 
 ;----------------------------------------------------------------------
 
-      jj = 0
+      jj = 2
       ii = 0
 
    ;do jj = 0,dimsizes(dstgrds)-1
     outres = "_"+dstgrds(jj)+"x"+dstgrds(jj)+"_MOM6"
-   ;do ii = 0,nfiles-1
-     infile = ocnfilelist(ii)
-    ;outfile = create_outfile_name(infile,outres,dstgrds(jj))
-    outfile = "test.nc"
-       time = ocnf[0]->time
-    delete(time@bounds)
 
    ; regrid a field to obtain the output xy dimensions
-    wgtsfile = nemsrc+"tripole.mx025.Ct.to.latlon.0p25.bilinear.nc"
+    wgtsfile = nemsrc+"tripole.mx025.Ct.to."+dsttype+dstgrds(jj)+".bilinear.nc"
           tt = ESMF_regrid_with_weights(sinrot,wgtsfile,False)
         tt!0 = "lat"
         tt!1 = "lon"
@@ -100,9 +94,31 @@ begin
         nlon = dims(1)
      print("fields will be remapped to destination grid size "\
            +nlon+"  "+nlat)
-     
+  
      delete(tt)
      delete(dims)
+
+   ; regrid the masks to obtain the interpolation masks. convienent to keep 
+   ; the time dimension even though they are constant 
+    wgtsfile = nemsrc+"tripole.mx025.Ct.to."+dsttype+dstgrds(jj)+".bilinear_nomask.nc"
+    rgmask2d = new((/1,nlat,nlon/),typeof(mask2d))
+    rgmask3d = new((/1,nlevs,nlat,nlon/),typeof(mask3d))
+
+    rgmask2d(0,:,:) = ESMF_regrid_with_weights(mask2d(0,:,:),wgtsfile,False)
+    do k = 0,nlevs-1
+     rgmask3d(0,k,:,:) = ESMF_regrid_with_weights(mask3d(0,k,:,:),wgtsfile,False)
+    end do
+
+;----------------------------------------------------------------------
+; loop over each file in the ocnfilelist
+;----------------------------------------------------------------------
+
+   ;do ii = 0,nfiles-1
+     infile = ocnfilelist(ii)
+    ;outfile = create_outfile_name(infile,outres,dstgrds(jj))
+    outfile = "test.nc"
+       time = ocnf[0]->time
+    delete(time@bounds)
 
 ;----------------------------------------------------------------------
 ; set up the output netcdf file
@@ -165,7 +181,12 @@ begin
      end do
     end do
  
-    ; explicitly exit file definition mode. **NOT REQUIRED**
+    if(output_masks)then
+     filevardef(outcdf, "mask2d", "float", (/"time", "lat", "lon"/)) 
+     filevardef(outcdf, "mask3d", "float", (/"time", "z_l", "lat", "lon"/)) 
+    end if
+
+    ; explicitly exit file definition mode.
     setfileoption(outcdf,"DefineMode",False)
 
     outcdf->time   = (/time/)     
@@ -174,11 +195,16 @@ begin
     outcdf->lat    = (/lat/)
     outcdf->lon    = (/lon/) 
 
+    if(output_masks)then
+     outcdf->mask2d    = (/rgmask2d/) 
+     outcdf->mask3d    = (/rgmask3d/) 
+    end if
+
 ;----------------------------------------------------------------------
 ;
 ;----------------------------------------------------------------------
 
-;if(1 .eq. 0)then
+if(1 .eq. 0)then
 ;----------------------------------------------------------------------
 ;
 ;----------------------------------------------------------------------
@@ -241,7 +267,7 @@ begin
     ; nv
     ;end do
    
-;end if   
+end if   
  
 if(1.eq.0)then
 ;----------------------------------------------------------------------

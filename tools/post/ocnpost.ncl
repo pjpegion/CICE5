@@ -71,6 +71,8 @@ begin
   ; get a 2 and 3 dimensional fields for creating the interpolation masks
   mask2d = where(ismissing(ocnf[0]->SST),  1.0, 0.0)
   mask3d = where(ismissing(ocnf[0]->temp), 1.0, 0.0)
+  printVarSummary(mask2d)
+  printVarSummary(ocnf[0]->SST)
 
 ;----------------------------------------------------------------------
 ; loop over the output resolutions 
@@ -101,9 +103,9 @@ begin
    ; regrid the masks to obtain the interpolation masks. convienent to keep 
    ; the time dimension even though they are constant 
     wgtsfile = nemsrc+"tripole.mx025.Ct.to."+dsttype+dstgrds(jj)+".bilinear_nomask.nc"
-    rgmask2d = new((/1,nlat,nlon/),typeof(mask2d))
-    rgmask3d = new((/1,nlevs,nlat,nlon/),typeof(mask3d))
-
+    rgmask2d = new((/1,nlat,nlon/),typeof(mask2d),default_fillvalue(typeof(mask2d)))
+    rgmask3d = new((/1,nlevs,nlat,nlon/),typeof(mask3d),default_fillvalue(typeof(mask2d)))
+   
     rgmask2d(0,:,:) = ESMF_regrid_with_weights(mask2d(0,:,:),wgtsfile,False)
     do k = 0,nlevs-1
      rgmask3d(0,k,:,:) = ESMF_regrid_with_weights(mask3d(0,k,:,:),wgtsfile,False)
@@ -163,6 +165,7 @@ begin
      else
       odims = (/"time", "z_l", "lat", "lon"/)
      end if
+     print("creating variable "+varname+" in file")
      filevardef(outcdf, varname, "float", odims)
      delete(odims)
     end do
@@ -176,6 +179,7 @@ begin
      else
       odims = (/"time", "z_l", "lat", "lon"/)
      end if
+     print("creating variable "+vecname+" in file")
      filevardef(outcdf, vecname, "float", odims) 
      delete(odims)
      end do
@@ -204,70 +208,57 @@ begin
 ;
 ;----------------------------------------------------------------------
 
-if(1 .eq. 0)then
+;if(1 .eq. 0)then
 ;----------------------------------------------------------------------
 ;
 ;----------------------------------------------------------------------
  
-    nv = 0
-    ;do nv = 0,nvars-1
+    ;nv = 1
+    do nv = 0,nvars-1
      varname = varlist(nv,0)
      vargrid = varlist(nv,1)
      varmeth = varlist(nv,2)
+     vardims = varlist(nv,3)
      print(nv+"   "+varname+"  "+vargrid+"  "+varmeth)
     
     ocnvar = ocnf[ii]->$varname$
      ndims = dimsizes(dimsizes(ocnvar))
      print(ndims+"   "+dimsizes(ocnvar))
 
-     wgtsfile = nemsrc+"tripole.mx025."+vargrid+".to.Ct.bilinear.nc"
-     ; unstagger the field if required
-     tt = where(ismissing(ocnvar),0.0,ocnvar)
      if(vargrid .ne. "Ct")then
-        tt = ESMF_regrid_with_weights(tt,wgtsfile,False)
-     end if
+      ; unstagger the field if required, this is always bilinear
+       wgtsfile = nemsrc+"tripole.mx025."+vargrid+".to.Ct.bilinear.nc"
 
-     ; regrid to latlon
-     wgtsfile = nemsrc+"tripole.mx025.Ct.to.latlon.0p25.bilinear.nc"
-     ; first get a field of the right dimensionality to use as a mask 
-     ; interpolate to latlon; where the resulting field is >0 is where missing values
-     ; were interpolated from land into field; mask these out
-     if(ndims .eq. 3)then
-       tmask = where(ismissing(ocnf[ii]->SSS),1.0,0.0)
-      rgmask = ESMF_regrid_with_weights(tmask,wgtsfile,False)
-      rtmask = where(rgmask .gt. 0.0,tt@_FillValue,1.0)
-
-       rgtt = ESMF_regrid_with_weights(tt,wgtsfile,False)
-       rgtt = where(ismissing(rtmask),tt@_FillValue,rgtt)
+        tt = where(ismissing(ocnvar),0.0,ocnvar)
+        tt(0,:,:) = ESMF_regrid_with_weights(tt(0,:,:),wgtsfile,False)
      else
-      do kk = 0,nlevs-1
-         tmask = where(ismissing(ocnf[ii]->so(:,kk,:,:)), 1.0,0.0)
-        rgmask = ESMF_regrid_with_weights(tmask,wgtsfile,False)
-        rtmask = where(rgmask .gt. 0.0,tt@_FillValue,1.0)
+        tt = ocnvar
+     end if
+     ;printVarSummary(tt)
 
-       ttmp = tt(:,kk,:,:)
-       rgtt = ESMF_regrid_with_weights(ttmp,wgtsfile,False)
-       rgtt = where(ismissing(rtmask),tt@_FillValue,rgtt)
-      end do
+     ; regrid to dsttype+dstgrd
+     print("remapping "+varname+" to grid "+dsttype+dstgrds(jj))
+     wgtsfile = nemsrc+"tripole.mx025.Ct.to."+dsttype+dstgrds(jj)+".bilinear.nc"
+     if(vardims .eq. "2")then
+      rgtt = regrid_and_mask2d(rgmask2d, tt, wgtsfile)
+     else
+      rgtt = regrid_and_mask3d(rgmask3d, tt, wgtsfile, nlevs)
      end if
 
-    outcdf->varname   = (/rgtt/)     
+     ; enter file definition mode to add variable attributes
+     setfileoption(outcdf,"DefineMode",True)
+     filevarattdef(outcdf, varname, rgtt)                 
+     setfileoption(outcdf,"DefineMode",False)
 
-     ;if(ndims .eq. 3)then
-     ;  tmask = where(ismissing(ocnf[ii]->SSS),1.0,0.0)
-     ;   rgtt = regrid_and_mask(tmask,tt,wgtsfile)
-     ;else
-     ; do kk = 0,nlevs-1
-     ;    tmask = where(ismissing(ocnf[ii]->so(:,kk,:,:)), 1.0,0.0)
-     ;               ttmp = tt(:,kk,:,:)
-     ;     rgtt(:,kk,:,:) = regrid_and_mask(tmask,ttmp,wgtsfile)
-     ; end do
-     ;end if
-    ;printVarSummary(rgtt)
+     outcdf->$varname$   = (/rgtt/)
+
+     delete(ocnvar)
+     delete(tt)
+     delete(rgtt)     
     ; nv
-    ;end do
-   
-end if   
+    end do
+
+;end if   
  
 if(1.eq.0)then
 ;----------------------------------------------------------------------

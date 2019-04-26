@@ -20,14 +20,28 @@ begin
     return(outfile)
 end
 
-function regrid_and_mask(amask:numeric,avar:numeric,wfile:string)
+function regrid_and_mask2d(amask:numeric,avar:numeric,wfile:string)
 begin
-      rgmask = ESMF_regrid_with_weights(amask,wfile,False)
-      rtmask = where(rgmask .gt. 0.0,avar@_FillValue,1.0)
+      rgvar = new(dimsizes(amask),typeof(avar))
+      amask = where(amask .gt. 0.0,amask@_FillValue,1.0)
+      rgvar(0,:,:) = ESMF_regrid_with_weights(avar(0,:,:),wfile,False)
 
-      rgvar = ESMF_regrid_with_weights(avar,wfile,False)
-      rgvar = where(ismissing(rtmask),avar@_FillValue,rgvar)
+      rgvar = where(ismissing(amask),avar@_FillValue,rgvar)
     return(rgvar)
 end
+
+function regrid_and_mask3d(amask:numeric,avar:numeric,wfile:string,kdim:numeric)
+begin
+      rgvar = new(dimsizes(amask),typeof(avar))
+      amask = where(amask .gt. 0.0,amask@_FillValue,1.0)
+     do k = 0,kdim-1
+       avar1 =  avar(:,k,:,:)
+      rgvar(0,k,:,:) = ESMF_regrid_with_weights(avar1(0,:,:),wfile,False)
+     end do
+      rgvar = where(ismissing(amask),avar@_FillValue,rgvar)
+
+    return(rgvar)
+end
+
 
 

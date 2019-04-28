@@ -43,5 +43,31 @@ begin
     return(rgvar)
 end
 
+function rotate_to_EW(vecs:list,cosrot:numeric,sinrot:numeric,kdim:numeric)
+begin
+    ; do ll = 0,ListCount(vecs)-1
+    ;  printVarSummary(vecs[ll])
+    ; end do
 
+       ut = vecs[0]
+       vt = vecs[1]
+     ; first copy Metadata
+     urot = ut
+     vrot = vt
+     dims = dimsizes(dimsizes(urot))
+     if(dims .eq. 3)then
+       urot(0,:,:) = ut(0,:,:)*cosrot + vt(0,:,:)*sinrot
+       vrot(0,:,:) = vt(0,:,:)*cosrot - ut(0,:,:)*sinrot
+     else
+       do k = 0,kdim-1
+        urot(0,k,:,:) = ut(0,k,:,:)*cosrot + vt(0,k,:,:)*sinrot
+        vrot(0,k,:,:) = vt(0,k,:,:)*cosrot - ut(0,k,:,:)*sinrot
+       end do
+     end if
+          ut = urot
+          vt = vrot
+     vecs[0] = ut
+     vecs[1] = vt
 
+     return(vecs)
+end

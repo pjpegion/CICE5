@@ -32,15 +32,16 @@ begin
    ; variables to be regridded with the native tripole stagger location
    ; and dimensionality 
 
-   varlist = (/ (/ "SSH", "Ct", "bilinear", "2"/) \
-               ,(/ "SST", "Ct", "bilinear", "2"/) \
-               ,(/ "SSS", "Ct", "bilinear", "2"/) \
-               ,(/"temp", "Ct", "bilinear", "3"/) \
-               ,(/  "so", "Ct", "bilinear", "3"/) \
+   varlist = (/ (/  "SSH", "Ct", "bilinear", "2"/) \
+               ,(/  "SST", "Ct", "bilinear", "2"/) \
+               ,(/  "SSS", "Ct", "bilinear", "2"/) \
+               ,(/"speed", "Ct", "bilinear", "2"/) \
+               ,(/ "temp", "Ct", "bilinear", "3"/) \
+               ,(/   "so", "Ct", "bilinear", "3"/) \
              /)
    ;print(varlist)
 
-    ; variables to be regridded with the native tripole stagger location
+    ; vectors to be regridded with the native tripole stagger location
     ; and dimensionality 
 
    nvpairs = 2
@@ -129,7 +130,7 @@ begin
     outfile = "test.nc"
        time = ocnf[0]->time
     delete(time@bounds)
-if(1 .eq. 0)then
+;if(1 .eq. 0)then
 ;----------------------------------------------------------------------
 ; set up the output netcdf file
 ;----------------------------------------------------------------------
@@ -212,7 +213,7 @@ if(1 .eq. 0)then
      outcdf->mask2d    = (/rgmask2d/) 
      outcdf->mask3d    = (/rgmask3d/) 
     end if
-end if
+;end if
 
 if(1 .eq. 0)then
 ;----------------------------------------------------------------------
@@ -259,6 +260,7 @@ if(1 .eq. 0)then
     end do
 
 end if
+;if(1 .eq. 0)then
 ;----------------------------------------------------------------------
 ;
 ;----------------------------------------------------------------------
@@ -271,74 +273,79 @@ end if
      vecdims  = veclist(nv,3,:)
      print(nv+"   "+vecnames+"  "+vecgrids+"  "+vecmeth)
 
-     vecpairs = NewList("lifo")
-     do nn = 0,1
-      ListAppend(vecpairs,ocnf[ii]->$vecnames(nn)$)
-     end do
+     ; unstagger vector pairs; this is always bilinear
+               n = 0
+            uvel = ocnf[ii]->$vecnames(n)$
+            uvel = where(ismissing(uvel),0.0,uvel)
+        wgtsfile = nemsrc+"tripole.mx025."+vecgrids(n)+".to.Ct.bilinear.nc"
+              ut = unstagger_UV(uvel,wgtsfile,nlevs)
+       print("unstagger velocity "+vecnames(n)+" using "+wgtsfile)
+       ;printVarSummary(ut)
 
-     ; loop over vector pairs and unstagger; this is always bilinear
-     do nn = 0,ListCount(vecpairs)-1
-        wgtsfile = nemsrc+"tripole.mx025."+vecgrids(nn)+".to.Ct.bilinear.nc"
-       print("unstagger velocity "+vecnames(nn)+" using "+wgtsfile)
+               n = 1
+            vvel = ocnf[ii]->$vecnames(n)$
+            vvel = where(ismissing(vvel),0.0,vvel)
+           vwgts = nemsrc+"tripole.mx025."+vecgrids(n)+".to.Ct.bilinear.nc"
+              vt = unstagger_UV(vvel,wgtsfile,nlevs)
+       print("unstagger velocity "+vecnames(n)+" using "+wgtsfile)
+       ;printVarSummary(vt)
 
-       ; replace missing values with 0s prior to unstaggering
-       ; the := removes a warning about the coordinates not matching
-       ; e.g. xh,yq and xq,yh
-         ocnvar := vecpairs[ii]
-             tt := where(ismissing(ocnvar),0.0,ocnvar)
+     ; create a vector pair list
+     vecpairs = NewList("fifo")
+     ListPush(vecpairs,vt)
+     ListPush(vecpairs,ut)
 
-         if(vecdims(nn) .eq. "2")then
-             tt(0,:,:) = ESMF_regrid_with_weights(tt(0,:,:),  wgtsfile,False)
-         else
-          do k = 0,nlevs-1
-           tt(0,k,:,:) = ESMF_regrid_with_weights(tt(0,k,:,:), wgtsfile,False)
-          end do
-         end if
-         ListPush(vecpairs,tt)
-         delete(tt)
-     end do
-     do ll = 0,ListCount(vecpairs)-1
-      printVarSummary(vecpairs[ll])
-     end do
-;if(1 .eq. 0)then
-     do ll = 0,ListCount(vecpairs)-1
-      ;printVarSummary(vecpairs[ll])
-      ocnvar  := vecpairs[ll]
-         ndims = dimsizes(dimsizes(ocnvar))
-      if(ndims .eq. 3)then
-       ocnvar!1 := CtDimNames(0)
-       ocnvar!2 := CtDimNames(1)
-      else
-       ocnvar!2 := CtDimNames(0)
-       ocnvar!3 := CtDimNames(1)
-      end if
-      printVarSummary(vecpairs[ll])
-     end do
-;end if
-if(1 .eq. 0)then
      ; rotate to EW
-     vecpairs = rotate_to_EW(vecpairs,sinrot,cosrot,nlevs)
+     ;vecpairs = rotate_to_EW(vecpairs,sinrot,cosrot,nlevs)
 
-     do ll = 0,ListCount(vecpairs)-1
-      printVarSummary(vecpairs[ll])
-     end do
+     ; change attribute to indicate these are now rotated velocities
+     ; delete 'cell_methods' attributes
+     ut = vecpairs[0]
+     ut@long_name=str_sub_str(ut@long_name,"X","Zonal")
+     delete(ut@cell_methods)
+     delete(ut@standard_name)
 
-     do nn = 0,ListCount(vecpairs)-1
-      ocnvar = vecpairs[nn]
+     vt = vecpairs[1]
+     vt@long_name=str_sub_str(vt@long_name,"Y","Meridional")
+     delete(vt@cell_methods)
+     delete(vt@standard_name)
+
+     print(vecpairs)
+
+;if(1 .eq. 0)then
+     n = 1
+     do n = 0,ListCount(vecpairs)-1
+      ocnvar = vecpairs[n]
+      print(dim_max(ocnvar)+"   "+dim_min(ocnvar))
+      ;printVarSummary(ocnvar)
+
       ; regrid to dsttype+dstgrd with method
-      print("remapping "+vecnames(nn)+" to grid "+dsttype+dstgrds(jj))
-      wgtsfile = nemsrc+"tripole.mx025.Ct.to."+dsttype+dstgrds(jj)+"."+vecmeth(nn)+".nc"
-      if(vecdims(nn) .eq. "2")then
+      print("remapping "+vecnames(n)+" to grid "+dsttype+dstgrds(jj))
+      wgtsfile = nemsrc+"tripole.mx025.Ct.to."+dsttype+dstgrds(jj)+"."+vecmeth(n)+".nc"
+      if(vecdims(n) .eq. "2")then
        rgtt = regrid_and_mask2d(rgmask2d, ocnvar, wgtsfile)
       else
        rgtt = regrid_and_mask3d(rgmask3d, ocnvar, wgtsfile, nlevs)
       end if
-     end do
+      ;printVarSummary(rgtt)
+      print(dim_max(rgtt)+"   "+dim_min(rgtt))
     
-     delete(rgtt)   
-     delete(ocnvar)
+      ; enter file definition mode to add variable attributes
+      setfileoption(outcdf,"DefineMode",True)
+      filevarattdef(outcdf, vecnames(n), rgtt)                 
+      setfileoption(outcdf,"DefineMode",False)
+
+      outcdf->$vecnames(n)$   = (/rgtt/)
+     end do
+;end if
+    
+     delete(ut)   
+     delete(vt)   
+     delete(uvel)
+     delete(vvel)
      delete(vecpairs)
-end if
+;end if
+
     ; nv
     ;end do
    ; ii

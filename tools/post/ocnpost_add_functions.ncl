@@ -1,5 +1,7 @@
 undef("create_outfile_name")
 undef("regrid_and_mask")
+undef("unstagger_UV")
+undef("rotate_to_EW")
 
 function create_outfile_name(infile:string,outres:string,outgrid:string)
 begin
@@ -41,6 +43,24 @@ begin
       rgvar = where(ismissing(amask),avar@_FillValue,rgvar)
 
     return(rgvar)
+end
+
+function unstagger_UV(avar:numeric,wfile:string,kdim:numeric)
+begin
+    tt = new(dimsizes(avar),typeof(avar))
+    if(dimsizes(dimsizes(avar)) .eq. 3)then
+        ;tt!1 = "yh"
+        ;tt!2 = "xh"
+        tt(0,:,:) =   ESMF_regrid_with_weights(avar(0,:,:),    wfile, False)
+    else
+     do k = 0,kdim-1
+        ;tt!2 = "yh"
+        ;tt!3 = "xh"
+      tt(0,k,:,:) =   ESMF_regrid_with_weights(avar(0,k,:,:),  wfile, False)
+     end do
+    end if
+
+    return(tt)
 end
 
 function rotate_to_EW(vecs:list,cosrot:numeric,sinrot:numeric,kdim:numeric)

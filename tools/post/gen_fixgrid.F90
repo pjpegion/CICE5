@@ -28,7 +28,12 @@ program gen_fixgrid
 !     |       |       |
 !     X-------X-------X
 !  i-1,j-1         i+1,j-1
-!      
+!    
+! Area of the T-grid cell is obtained as in MOM_grid_initialize where
+! tmpV = dx on SG and tmpU is dy on SG
+!
+!    dxT(i,j) = tmpV(i2-1,j2-1) + tmpV(i2,j2-1)
+!    dyT(i,j) = tmpU(i2-1,j2-1) + tmpU(i2-1,j2)
 !
 ! Tripole Seam flip: ipL,ipR left,right poles on seam
 !
@@ -83,7 +88,11 @@ program gen_fixgrid
   character(len= 10) :: res = 'mx025'
 
   ! super-grid source variables
-  real(kind=8), dimension(0:nx,0:ny)   :: x, y
+  real(kind=8), dimension(0:nx,0:ny)   ::  x,  y
+  real(kind=8), dimension(  nx,0:ny)   :: dx
+  real(kind=8), dimension(0:nx,  ny)   :: dy
+
+  real(kind=8) :: dxT, dyT
 
   character(len=256) :: fname_out, fname_in
   character(len=256) :: history
@@ -147,6 +156,13 @@ program gen_fixgrid
  
   rc = nf90_inq_varid(ncid, 'y', id)  !lat
   rc = nf90_get_var(ncid,    id,  y)
+
+  rc = nf90_inq_varid(ncid, 'dx', id) 
+  rc = nf90_get_var(ncid,     id, dx)
+
+  rc = nf90_inq_varid(ncid, 'dy', id) 
+  rc = nf90_get_var(ncid,     id, dy)
+
   rc = nf90_close(ncid)
   print *,'super grid size ',size(y,1),size(y,2)
 
@@ -168,6 +184,10 @@ program gen_fixgrid
      latCt(i,j) =     y(i2-1,j2-1)
      latCu(i,j) =     y(i2,  j2-1)
      latCv(i,j) =     y(i2-1,j2  )
+    !m2
+            dxT = dx(i2-1,j2-1) + dx(i2,j2-1)
+            dyT = dy(i2-1,j2-1) + dy(i2-1,j2)
+    areaCt(i,j) = dxT*dyT
    enddo
   enddo
 
@@ -217,7 +237,6 @@ program gen_fixgrid
    !print *,i,xlonCu(i),lonCu(i2,nj)
   enddo
  
-  !xlonCu(ni) = xlonCu(ni) - 360.d0 
   call checkxlatlon
   !do i = 1,ni
   !  i2 = ipole(2)+(ipole(1)-i)
@@ -249,12 +268,6 @@ program gen_fixgrid
   call fill_vertices(1,nj-1, iVertBu,jVertBu, latCt,lonCt, latBu_vert,lonBu_vert)
   call              fill_top(iVertBu,jVertBu, latCt,lonCt, latBu_vert,lonBu_vert, xlatCt, xlonCt)
  
-  !   i = 1
-  !do j = 1,nj
-  !  if(lont_vert(i,j,1) .lt. 0.0)lont_vert(i,j,1) = lont_vert(i,j,1)+240.d0
-  !  if(lont_vert(i,j,4) .lt. 0.0)lont_vert(i,j,4) = lont_vert(i,j,4)+240.d0
-  !enddo
-
   call checkpoint
 
   if(minval(latCt_vert) .lt. -1.e3)stop
@@ -292,6 +305,12 @@ program gen_fixgrid
   dim2(1) = ni_dim
    rc = nf90_def_var(ncid, 'wet', nf90_int, dim2, id)
 
+  !area
+  dim2(2) = nj_dim
+  dim2(1) = ni_dim
+   rc = nf90_def_var(ncid, 'area', nf90_double, dim2, id)
+   rc = nf90_put_att(ncid, id,     'units',  'm2')
+
   dim2(2) = nj_dim
   dim2(1) = ni_dim
   do ii = 1,ncoord
@@ -318,6 +337,9 @@ program gen_fixgrid
 
   rc = nf90_inq_varid(ncid,   'wet',      id)
   rc = nf90_put_var(ncid,        id,     wet)
+
+  rc = nf90_inq_varid(ncid,  'area',      id)
+  rc = nf90_put_var(ncid,        id,  areaCt)
 
   rc = nf90_inq_varid(ncid,  'lonCt',     id)
   rc = nf90_put_var(ncid,        id,   lonCt)

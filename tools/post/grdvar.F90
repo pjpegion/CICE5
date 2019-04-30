@@ -16,6 +16,9 @@ module grdvar
   real(kind=8), dimension(ni,nj) :: latCu, lonCu ! lat and lon of U on C-grid
   real(kind=8), dimension(ni,nj) :: latBu, lonBu ! lat and lon of corners on C-grid
 
+  ! areas of Ct grid cell
+  real(kind=8), dimension(ni,nj) :: areaCt
+
   ! vertices of each stagger location
   real(kind=8), dimension(ni,nj,nv) :: latCt_vert, lonCt_vert
   real(kind=8), dimension(ni,nj,nv) :: latCu_vert, lonCu_vert

@@ -69,7 +69,7 @@
 ;
 ;    Generating accurate conservative weights requires that the 
 ;    vertices of the center T grid cell be given. These values
-;    are available in the tripole.grid.mx025.nc file. 
+;    are available in the tripole.mx025.nc file. 
 ;
 ; An efficient way to accomplish the unstaggering of velocities 
 ; is to determine the bilinear interpolation weights between grid 
@@ -77,27 +77,32 @@
 ; example, a set of weights can be generated one time for Cu->T
 ; and reused thereafter.
 ;
-; An efficient way to regrid from the tripole to regular
-; lat/lon grids is to generate interpolation weights for both bilinear  
+; An efficient way to regrid from the tripole to rectilinear
+; grids is to generate interpolation weights for both bilinear  
 ; and conservative regridding. These weights can also be generated 
 ; once and reused thereafter. Bilinear weights generated for the first 
 ; vertical level can be used on other levels (where the masking 
 ; changes) by utilizing the correct masking procedure.
+; For this purpose, it is useful to generate a SCRIP file for the
+; Ct grid which does not contain a mask.
 ;
 ; This script will generate the weights required for both
 ; unstaggering of velocities on the MOM6 and CICE tripole grids
 ; as well as bilinear and conservative regridding to pre-defined
-; regular latlon grids. Weights will be generated using NCL's ESMF
+; regular rectilinear grids. Weights will be generated using NCL's ESMF
 ; regridding tools.
 ;
 ; This file still has to be loaded manually
 load "$NCARG_ROOT/lib/ncarg/nclscripts/esmf/ESMF_regridding.ncl"
+; substitute a curvilinear_to_SCRIP.ncl which does not require
+; re-ordering the grid
+load "my_curvilinear_to_SCRIP.ncl"
 ;------------------------------------------------------------------
 begin
 
     generate_unstagger_weights = False
-    generate_dstgrid_SCRIP_files = True
-    generate_tripole_latlon_weights = True
+    generate_dstgrid_SCRIP_files = False
+    generate_tripole_rect_weights = True
 
 ;---Specify a location to use
         nemsrc     = "/scratch4/NCEPDEV/ocean/save/Denise.Worthen/NEMS_INPUT0.1/ocnicepost/"
@@ -155,7 +160,7 @@ begin
                            cornerlatname+"  "+\
                            cornerlonname)
 
-    curvilinear_to_SCRIP(srcfile, gf->$srclatname$, gf->$srclonname$, Opt)
+    my_curvilinear_to_SCRIP(srcfile, gf->$srclatname$, gf->$srclonname$, Opt)
     delete(Opt) 
    end do 
 
@@ -183,15 +188,14 @@ begin
                            cornerlatname+"  "+\
                            cornerlonname)
 
-    curvilinear_to_SCRIP(srcfile, gf->$srclatname$, gf->$srclonname$, Opt)
+    my_curvilinear_to_SCRIP(srcfile, gf->$srclatname$, gf->$srclonname$, Opt)
     delete(Opt)
 
    ; close
    delete(gf)
 
 ;----------------------------------------------------------------------
-; Generate the weights for unstaggering the grids; these are all
-; bilinear
+; generate the weights used to unstagger the grids
 ;----------------------------------------------------------------------
 
      dstfile = nemsrc+"Ct_SCRIP_nomask.nc"
@@ -244,29 +248,20 @@ begin
      dstfile = nemsrc+"rect."+dstgrds(ii)+"_SCRIP.nc"
      print("generating dstfile "+dstfile)
      rectilinear_to_SCRIP(dstfile,lats,lons,Opt)
-
-     delete(lats)
      delete(lons)
-
-     ; latlon destination
-     dstfile = nemsrc+"latlon."+dstgrds(ii)+"_SCRIP.nc"
-     print("generating dstfile "+dstfile)
-     latlon_to_SCRIP(dstfile,dstres(ii),Opt)
-
+     delete(lats)
      delete(Opt)
     end do
    end if
 
-   if(generate_tripole_latlon_weights)then
+   if(generate_tripole_rect_weights)then
 ;----------------------------------------------------------------------
-; generate SCRIP file for each latlon grid and then the weight file
-; for tripole Ct->latlon
+; generate SCRIP file for each rectilinear grid and then the weight file
+; for tripole Ct->rect
 ;----------------------------------------------------------------------
 
-    jj=0
-    ;jj=1
     srcfile = nemsrc+"Ct_SCRIP.nc"
-    ;do jj = 0,dimsizes(methods)-1
+    do jj = 0,dimsizes(methods)-1
       Opt                   = True
       Opt@ForceOverwrite    = True
       Opt@PrintTimings      = True
@@ -274,38 +269,15 @@ begin
       Opt@Debug             = True
       Opt@Check             = True
 
-     ii = 2
-     ;do ii = 0,dimsizes(dstgrds)-1
-    
-      dstfile = nemsrc+"latlon."+dstgrds(ii)+"_SCRIP.nc"
-      ;this file contains the weights
-      wgtfile = nemsrc+"tripole.mx025.Ct.to.latlon."+dstgrds(ii)+"."+methods(jj)+".nc"
-      ESMF_regrid_gen_weights(srcfile,dstfile,wgtfile,Opt)
-
+     srcfile = nemsrc+"Ct_SCRIP_nomask.nc"
+     do ii = 0,dimsizes(dstgrds)-1
       dstfile = nemsrc+"rect."+dstgrds(ii)+"_SCRIP.nc"
       ;this file contains the weights
       wgtfile = nemsrc+"tripole.mx025.Ct.to.rect."+dstgrds(ii)+"."+methods(jj)+".nc"
       ESMF_regrid_gen_weights(srcfile,dstfile,wgtfile,Opt)
-      ;delete(Opt@GridMask)
-     ;end do
+     end do
 
-     srcfile = nemsrc+"Ct_SCRIP_nomask.nc"
-     ii = 2
-     ;do ii = 0,dimsizes(dstgrds)-1
-
-      dstfile = nemsrc+"latlon."+dstgrds(ii)+"_SCRIP.nc"
-      ;this file contains the weights
-      wgtfile = nemsrc+"tripole.mx025.Ct.to.latlon."+dstgrds(ii)+"."+methods(jj)+"_nomask.nc"
-      ESMF_regrid_gen_weights(srcfile,dstfile,wgtfile,Opt)
-
-      dstfile = nemsrc+"rect."+dstgrds(ii)+"_SCRIP.nc"
-      ;this file contains the weights
-      wgtfile = nemsrc+"tripole.mx025.Ct.to.rect."+dstgrds(ii)+"."+methods(jj)+"_nomask.nc"
-      ESMF_regrid_gen_weights(srcfile,dstfile,wgtfile,Opt)
-      ;delete(Opt@GridMask)
-     ;end do
-
-    ;end do
+    end do
 
    end if
 exit

@@ -71,17 +71,12 @@ begin
        z_l = ocnf[0]->z_l
        z_i = ocnf[0]->z_i
      nlevs = dimsizes(z_l)
-  ; get the names of the Ct dimensions; this is useful for renaming
-  ; the vector coord dimensions to the Ct names after unstaggering 
-  ; to prevent warnings about coords not matching
-  CtDimNames = getvardimnames(sinrot)
-  print(CtDimNames)
 
   ; get a 2 and 3 dimensional fields for creating the interpolation masks
   mask2d = where(ismissing(ocnf[0]->SST),  1.0, 0.0)
   mask3d = where(ismissing(ocnf[0]->temp), 1.0, 0.0)
   ;printVarSummary(mask2d)
-  ;printVarSummary(ocnf[0]->SST)
+  ;printVarSummary(mask3d)
 
 ;----------------------------------------------------------------------
 ; loop over the output resolutions 
@@ -109,8 +104,8 @@ begin
      delete(tt)
      delete(dims)
 
-   ; regrid the masks to obtain the interpolation masks. convienent to keep 
-   ; the time dimension even though they are constant 
+   ; regrid the masks to obtain the interpolation masks. keep  the time
+   ; dimension (even though they are constant) 
     wgtsfile = nemsrc+"tripole.mx025.Ct.to."+dsttype+dstgrds(jj)+".bilinear_nomask.nc"
     rgmask2d = new((/1,nlat,nlon/),typeof(mask2d),default_fillvalue(typeof(mask2d)))
     rgmask3d = new((/1,nlevs,nlat,nlon/),typeof(mask3d),default_fillvalue(typeof(mask2d)))
@@ -203,6 +198,7 @@ begin
     ; explicitly exit file definition mode.
     setfileoption(outcdf,"DefineMode",False)
 
+    ; write the dimensions to the file
     outcdf->time   = (/time/)     
     outcdf->z_l    = (/z_l/)     
     outcdf->z_i    = (/z_i/)     
@@ -273,52 +269,39 @@ end if
      vecdims  = veclist(nv,3,:)
      print(nv+"   "+vecnames+"  "+vecgrids+"  "+vecmeth)
 
-     ; unstagger vector pairs; this is always bilinear
-               n = 0
-            uvel = ocnf[ii]->$vecnames(n)$
-            uvel = where(ismissing(uvel),0.0,uvel)
-        wgtsfile = nemsrc+"tripole.mx025."+vecgrids(n)+".to.Ct.bilinear.nc"
-              ut = unstagger_UV(uvel,wgtsfile,nlevs)
-       print("unstagger velocity "+vecnames(n)+" using "+wgtsfile)
-       ;printVarSummary(ut)
-
-               n = 1
-            vvel = ocnf[ii]->$vecnames(n)$
-            vvel = where(ismissing(vvel),0.0,vvel)
-           vwgts = nemsrc+"tripole.mx025."+vecgrids(n)+".to.Ct.bilinear.nc"
-              vt = unstagger_UV(vvel,wgtsfile,nlevs)
-       print("unstagger velocity "+vecnames(n)+" using "+wgtsfile)
-       ;printVarSummary(vt)
-
      ; create a vector pair list
+           n = 0
+        uvel = ocnf[ii]->$vecnames(n)$
+          ut = where(ismissing(uvel),0.0,uvel)
+       copy_VarAtts(uvel,ut)
+       uwgts = nemsrc+"tripole.mx025."+vecgrids(n)+".to.Ct.bilinear.nc"
+
+           n = 1
+        vvel = ocnf[ii]->$vecnames(n)$
+          vt = where(ismissing(vvel),0.0,vvel)
+       copy_VarAtts(vvel,vt)
+        vwgts = nemsrc+"tripole.mx025."+vecgrids(n)+".to.Ct.bilinear.nc"
+     print(ut(0,500,500)+"   "+vt(0,500,500))
+
      vecpairs = NewList("fifo")
-     ListPush(vecpairs,vt)
-     ListPush(vecpairs,ut)
+     ListAppend(vecpairs,ut)
+     ListAppend(vecpairs,vt)
 
-     ; rotate to EW
-     ;vecpairs = rotate_to_EW(vecpairs,sinrot,cosrot,nlevs)
+     vecpairs = unstagger(vecpairs,uwgts,vwgts,nlevs)
+     ;print(vecpairs)
+     print(ut(0,500,500)+"   "+vt(0,500,500))
 
-     ; change attribute to indicate these are now rotated velocities
-     ; delete 'cell_methods' attributes
-     ut = vecpairs[0]
-     ut@long_name=str_sub_str(ut@long_name,"X","Zonal")
-     delete(ut@cell_methods)
-     delete(ut@standard_name)
-
-     vt = vecpairs[1]
-     vt@long_name=str_sub_str(vt@long_name,"Y","Meridional")
-     delete(vt@cell_methods)
-     delete(vt@standard_name)
-
-     print(vecpairs)
+     vecpairs = rotate_to_EW(vecpairs,cosrot,sinrot,nlevs)
+     ;print(vecpairs)
+     print(ut(0,500,500)+"   "+vt(0,500,500))
 
 ;if(1 .eq. 0)then
-     n = 1
-     do n = 0,ListCount(vecpairs)-1
+     n=1
+     do n = 0,1
       ocnvar = vecpairs[n]
-      print(dim_max(ocnvar)+"   "+dim_min(ocnvar))
-      ;printVarSummary(ocnvar)
-
+      printVarSummary(ocnvar)
+      print(ocnvar(0,500,500))
+      
       ; regrid to dsttype+dstgrd with method
       print("remapping "+vecnames(n)+" to grid "+dsttype+dstgrds(jj))
       wgtsfile = nemsrc+"tripole.mx025.Ct.to."+dsttype+dstgrds(jj)+"."+vecmeth(n)+".nc"
@@ -327,18 +310,20 @@ end if
       else
        rgtt = regrid_and_mask3d(rgmask3d, ocnvar, wgtsfile, nlevs)
       end if
-      ;printVarSummary(rgtt)
+      ;print(ocnvar(0,500,500))
       print(dim_max(rgtt)+"   "+dim_min(rgtt))
+      ;printVarSummary(rgtt)
     
       ; enter file definition mode to add variable attributes
       setfileoption(outcdf,"DefineMode",True)
       filevarattdef(outcdf, vecnames(n), rgtt)                 
       setfileoption(outcdf,"DefineMode",False)
-
+    
       outcdf->$vecnames(n)$   = (/rgtt/)
+      delete(ocnvar)
+      delete(rgtt)
      end do
 ;end if
-    
      delete(ut)   
      delete(vt)   
      delete(uvel)

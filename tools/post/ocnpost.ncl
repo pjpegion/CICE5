@@ -49,7 +49,7 @@ begin
    veclist = (/ (/ (/"SSU", "SSV"/), (/"Cu", "Cv"/), (/"bilinear", "bilinear"/), (/"2", "2"/) /) ,\
                 (/ (/ "uo",  "vo"/), (/"Cu", "Cv"/), (/"bilinear", "bilinear"/), (/"3", "3"/) /)  \
              /)
-   print(veclist)
+   ;print(veclist)
 
      dims = dimsizes(varlist)
     nvars = dims(0)
@@ -106,7 +106,7 @@ begin
 
    ; regrid the masks to obtain the interpolation masks. keep  the time
    ; dimension (even though they are constant) 
-    wgtsfile = nemsrc+"tripole.mx025.Ct.to."+dsttype+dstgrds(jj)+".bilinear_nomask.nc"
+    wgtsfile = nemsrc+"tripole.mx025.Ct.to."+dsttype+dstgrds(jj)+".bilinear.nc"
     rgmask2d = new((/1,nlat,nlon/),typeof(mask2d),default_fillvalue(typeof(mask2d)))
     rgmask3d = new((/1,nlevs,nlat,nlon/),typeof(mask3d),default_fillvalue(typeof(mask2d)))
    
@@ -114,6 +114,10 @@ begin
     do k = 0,nlevs-1
      rgmask3d(0,k,:,:) = ESMF_regrid_with_weights(mask3d(0,k,:,:),wgtsfile,False)
     end do
+
+    ; create the interpolation mask
+    rgmask2d = where(rgmask2d .gt. 0.0, rgmask2d@_FillValue, 1.0)
+    rgmask3d = where(rgmask3d .gt. 0.0, rgmask3d@_FillValue, 1.0)
 
 ;----------------------------------------------------------------------
 ; loop over each file in the ocnfilelist
@@ -237,11 +241,13 @@ if(1 .eq. 0)then
      ; regrid to dsttype+dstgrd with method
      print("remapping "+varname+" to grid "+dsttype+dstgrds(jj))
      wgtsfile = nemsrc+"tripole.mx025.Ct.to."+dsttype+dstgrds(jj)+"."+varmeth+".nc"
-     if(vardims .eq. "2")then
-      rgtt = regrid_and_mask2d(rgmask2d, ocnvar, wgtsfile)
-     else
-      rgtt = regrid_and_mask3d(rgmask3d, ocnvar, wgtsfile, nlevs)
-     end if
+
+     rgtt = ESMF_regrid_with_weights(ocnvar,wgtsfile,False)
+    if(vardims .eq. "2")then
+     rgtt = where(ismissing(rgmask2d),ocnvar@_FillValue,rgtt)
+    else
+     rgtt = where(ismissing(rgmask3d),ocnvar@_FillValue,rgtt)
+    end if
 
      ; enter file definition mode to add variable attributes
      setfileoption(outcdf,"DefineMode",True)
@@ -261,8 +267,11 @@ end if
 ;
 ;----------------------------------------------------------------------
    
+    system("/bin/rm -f " + "vecs.nc")    ; remove if exists
+    testcdf  = addfile ("vecs.nc", "c")  ; open output file
+
     nv = 0
-   ;do nv = 0,nvpairs-1
+   do nv = 0,nvpairs-1
      vecnames = veclist(nv,0,:)
      vecgrids = veclist(nv,1,:)
      vecmeth  = veclist(nv,2,:)
@@ -270,69 +279,65 @@ end if
      print(nv+"   "+vecnames+"  "+vecgrids+"  "+vecmeth)
 
      ; create a vector pair list
-           n = 0
-        uvel = ocnf[ii]->$vecnames(n)$
-          ut = where(ismissing(uvel),0.0,uvel)
-       copy_VarAtts(uvel,ut)
-       uwgts = nemsrc+"tripole.mx025."+vecgrids(n)+".to.Ct.bilinear.nc"
-
-           n = 1
-        vvel = ocnf[ii]->$vecnames(n)$
-          vt = where(ismissing(vvel),0.0,vvel)
-       copy_VarAtts(vvel,vt)
-        vwgts = nemsrc+"tripole.mx025."+vecgrids(n)+".to.Ct.bilinear.nc"
-     print(ut(0,500,500)+"   "+vt(0,500,500))
-
      vecpairs = NewList("fifo")
+            n = 0
+         uvel = ocnf[ii]->$vecnames(n)$
+       vecfld = where(ismissing(uvel),0.0,uvel)
+        copy_VarAtts(uvel,vecfld)
+     print("unstagger "+vecnames(n)+" from "+vecgrids(n)+" to Ct")
+     wgtsfile = nemsrc+"tripole.mx025."+vecgrids(n)+".to.Ct.bilinear.nc"
+           ut = ESMF_regrid_with_weights(vecfld,wgtsfile,False)
+
+            n = 1
+         vvel = ocnf[ii]->$vecnames(n)$
+       vecfld = where(ismissing(vvel),0.0,vvel)
+        copy_VarAtts(vvel,vecfld)
+     print("unstagger "+vecnames(n)+" from "+vecgrids(n)+" to Ct")
+     wgtsfile = nemsrc+"tripole.mx025."+vecgrids(n)+".to.Ct.bilinear.nc"
+           vt = ESMF_regrid_with_weights(vecfld,wgtsfile,False)
+
      ListAppend(vecpairs,ut)
      ListAppend(vecpairs,vt)
-
-     vecpairs = unstagger(vecpairs,uwgts,vwgts,nlevs)
      ;print(vecpairs)
-     print(ut(0,500,500)+"   "+vt(0,500,500))
 
+     ; rotate
      vecpairs = rotate_to_EW(vecpairs,cosrot,sinrot,nlevs)
      ;print(vecpairs)
-     print(ut(0,500,500)+"   "+vt(0,500,500))
 
-;if(1 .eq. 0)then
-     n=1
+     ; remap
      do n = 0,1
-      ocnvar = vecpairs[n]
-      printVarSummary(ocnvar)
-      print(ocnvar(0,500,500))
-      
+      vecfld = vecpairs[n]
       ; regrid to dsttype+dstgrd with method
       print("remapping "+vecnames(n)+" to grid "+dsttype+dstgrds(jj))
       wgtsfile = nemsrc+"tripole.mx025.Ct.to."+dsttype+dstgrds(jj)+"."+vecmeth(n)+".nc"
+
+       rgtt = ESMF_regrid_with_weights(vecfld,wgtsfile,False)
       if(vecdims(n) .eq. "2")then
-       rgtt = regrid_and_mask2d(rgmask2d, ocnvar, wgtsfile)
+       rgtt = where(ismissing(rgmask2d),vecfld@_FillValue,rgtt)
       else
-       rgtt = regrid_and_mask3d(rgmask3d, ocnvar, wgtsfile, nlevs)
+       rgtt = where(ismissing(rgmask3d),vecfld@_FillValue,rgtt)
       end if
-      ;print(ocnvar(0,500,500))
-      print(dim_max(rgtt)+"   "+dim_min(rgtt))
-      ;printVarSummary(rgtt)
-    
+
       ; enter file definition mode to add variable attributes
       setfileoption(outcdf,"DefineMode",True)
       filevarattdef(outcdf, vecnames(n), rgtt)                 
       setfileoption(outcdf,"DefineMode",False)
     
       outcdf->$vecnames(n)$   = (/rgtt/)
-      delete(ocnvar)
+      ;delete(vecfld)
       delete(rgtt)
      end do
-;end if
-     delete(ut)   
-     delete(vt)   
-     delete(uvel)
-     delete(vvel)
-     delete(vecpairs)
+      delete(uvel)
+      delete(vvel)
+      delete(ut)
+      delete(vt)
+      delete(vecfld)
+      delete(vecpairs)
+
 ;end if
 
     ; nv
-    ;end do
+    end do
    ; ii
    ;end do
   ; jj

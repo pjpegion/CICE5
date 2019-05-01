@@ -31,23 +31,34 @@ begin
 
    ; variables to be regridded with the native tripole stagger location
    ; and dimensionality 
-
-   varlist = (/ (/  "SSH", "Ct", "bilinear", "2"/) \
-               ,(/  "SST", "Ct", "bilinear", "2"/) \
-               ,(/  "SSS", "Ct", "bilinear", "2"/) \
-               ,(/"speed", "Ct", "bilinear", "2"/) \
-               ,(/ "temp", "Ct", "bilinear", "3"/) \
-               ,(/   "so", "Ct", "bilinear", "3"/) \
+   
+   varlist = (/ (/      "SSH", "Ct", "bilinear", "2"/) \
+               ,(/      "SST", "Ct", "bilinear", "2"/) \
+               ,(/      "SSS", "Ct", "bilinear", "2"/) \
+               ,(/    "speed", "Ct", "bilinear", "2"/) \
+               ,(/     "temp", "Ct", "bilinear", "3"/) \
+               ,(/       "so", "Ct", "bilinear", "3"/) \
+               ,(/   "latent", "Ct", "conserve", "2"/) \
+               ,(/ "sensible", "Ct", "conserve", "2"/) \
+               ,(/       "SW", "Ct", "conserve", "2"/) \
+               ,(/       "LW", "Ct", "conserve", "2"/) \
+               ,(/     "evap", "Ct", "conserve", "2"/) \
+               ,(/    "lprec", "Ct", "conserve", "2"/) \
+               ,(/    "fprec", "Ct", "conserve", "2"/) \
+               ,(/"LwLatSens", "Ct", "conserve", "2"/) \
+               ,(/ "Heat_PmE", "Ct", "conserve", "2"/) \
              /)
    ;print(varlist)
 
     ; vectors to be regridded with the native tripole stagger location
     ; and dimensionality 
-
-   nvpairs = 2
+    ; note: vectors are always unstaggered using bilinear weights, but can
+    ; be remapped using conservative
+   nvpairs = 3
    veclist = new( (/nvpairs,4,2/),"string")
-   veclist = (/ (/ (/"SSU", "SSV"/), (/"Cu", "Cv"/), (/"bilinear", "bilinear"/), (/"2", "2"/) /) ,\
-                (/ (/ "uo",  "vo"/), (/"Cu", "Cv"/), (/"bilinear", "bilinear"/), (/"3", "3"/) /)  \
+   veclist = (/ (/ (/  "SSU",   "SSV"/), (/"Cu", "Cv"/), (/"bilinear", "bilinear"/), (/"2", "2"/) /) \
+              , (/ (/   "uo",    "vo"/), (/"Cu", "Cv"/), (/"bilinear", "bilinear"/), (/"3", "3"/) /) \
+              , (/ (/ "taux",  "tauy"/), (/"Cu", "Cv"/), (/"conserve", "conserve"/), (/"2", "2"/) /) \
              /)
    ;print(veclist)
 
@@ -83,7 +94,7 @@ begin
 ; loop over the output resolutions 
 ;----------------------------------------------------------------------
 
-      jj = 2
+      jj = 1
       ii = 0
 
    do jj = 0,dimsizes(dstgrds)-1
@@ -295,7 +306,7 @@ begin
      ;print(vecpairs)
 
      ; rotate
-     ;vecpairs = rotate_to_EW(vecpairs,cosrot,sinrot,nlevs)
+     vecpairs = rotate_to_EW(vecpairs,cosrot,sinrot,nlevs)
      ;print(vecpairs)
 
      ; remap
@@ -327,7 +338,7 @@ begin
 
    ; ii, loop over files
    ;end do
-  ; jj, loop over destination grids
+   ;jj, loop over destination grids
    delete([/lat,lon,nlon,nlat/])
    delete([/rgmask2d,rgmask3d/])
   end do

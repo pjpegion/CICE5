@@ -2,7 +2,7 @@ Post Processing of ice/ocean tripole to regular lat lon
 
 Three steps:
 1) Generate the tripole fixed grid containing all stagger locations
-and their vertices
+and their vertices. Use gen_fixgrid.F90. This creates grid tripole.mx025.nc
 
 2) Generate the interpolation weights to go from stagger locations to 
 center locations and from center locations to regular lat lon. The
@@ -10,4 +10,5 @@ unstagger weights can be checked with check_weights.ncl
 
 Steps 1 and 2 need be done only once for a given tripole grid
 
-3) Regrid the fields
+3) Regrid the fields using ocnpost.ncl. One complete ocn file takes
+about in 188.455 seconds

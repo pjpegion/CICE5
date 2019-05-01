@@ -100,21 +100,23 @@ load "my_curvilinear_to_SCRIP.ncl"
 ;------------------------------------------------------------------
 begin
 
+    ; the weights need to generated one time only. The following
+    ; flags will re-generate the chose weights file
     generate_unstagger_weights = False
     generate_dstgrid_SCRIP_files = False
     generate_tripole_rect_weights = True
 
-;---Specify a location to use
+    ; specify a location to use
         nemsrc     = "/scratch4/NCEPDEV/ocean/save/Denise.Worthen/NEMS_INPUT0.1/ocnicepost/"
-;---Interpolation methods
+    ; interpolation methods
     methods        = (/"bilinear" ,"conserve"/)
 
-;---Source tripole grid  
+    ; source tripole grid  
             srcloc = nemsrc
           gridfile = "tripole.mx025.nc"
        staggerlocs = (/"Ct", "Cu", "Cv", "Bu"/)
 
-;---Destintion grids 
+    ; destintion grids 
        dstgrds     = (/    "0p25",     "0p5",  "1p0"/)
        dstres      = (/ "0.25deg",  "0.5deg", "1deg"/)
 

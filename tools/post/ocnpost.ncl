@@ -5,10 +5,10 @@
 ; to regular lat/lon grids 
 ;
 ; This script will regrid MOM6 ocean output on the
-; tripole grid to destination regular latlon grids
-; using pre-computed ESMF weights to unstagger the
-; velocities, regrid to the regular grid and then
-; write the fields to a netcdf file
+; tripole grid to destination a set of rectilinear
+; grids using pre-computed ESMF weights to regrid the
+; listed fields to the destination grid and write the 
+; results to a new netCDF file
 ;
   load "$NCARG_ROOT/lib/ncarg/nclscripts/esmf/ESMF_regridding.ncl"
   load "ocnpost_add_functions.ncl"
@@ -55,6 +55,7 @@ begin
     nvars = dims(0)
    delete(dims)
 
+   begTime = get_cpu_time()
 ;----------------------------------------------------------------------
 ; make a list of the directories and files from the run 
 ;----------------------------------------------------------------------
@@ -85,7 +86,7 @@ begin
       jj = 2
       ii = 0
 
-   ;do jj = 0,dimsizes(dstgrds)-1
+   do jj = 0,dimsizes(dstgrds)-1
     outres = "_"+dstgrds(jj)+"x"+dstgrds(jj)+"_MOM6"
 
    ; regrid a field to obtain the output xy dimensions
@@ -109,11 +110,13 @@ begin
     wgtsfile = nemsrc+"tripole.mx025.Ct.to."+dsttype+dstgrds(jj)+".bilinear.nc"
     rgmask2d = new((/1,nlat,nlon/),typeof(mask2d),default_fillvalue(typeof(mask2d)))
     rgmask3d = new((/1,nlevs,nlat,nlon/),typeof(mask3d),default_fillvalue(typeof(mask2d)))
-   
-       rgmask2d(0,:,:) = ESMF_regrid_with_weights(mask2d(0,:,:),  wgtsfile,False)
-    do k = 0,nlevs-1
-     rgmask3d(0,k,:,:) = ESMF_regrid_with_weights(mask3d(0,k,:,:),wgtsfile,False)
-    end do
+  
+    ; the mask2d,mask3d contain 1's on land and 0's at valid points.
+    ; wherever the regridded mask > 0, land values have crept into the
+    ; field. remapped fields can then be masked with the interpolation
+    ; mask 
+    rgmask2d = ESMF_regrid_with_weights(mask2d, wgtsfile,False)
+    rgmask3d = ESMF_regrid_with_weights(mask3d, wgtsfile,False)
 
     ; create the interpolation mask
     rgmask2d = where(rgmask2d .gt. 0.0, rgmask2d@_FillValue, 1.0)
@@ -126,10 +129,10 @@ begin
    ;do ii = 0,nfiles-1
      infile = ocnfilelist(ii)
     ;outfile = create_outfile_name(infile,outres,dstgrds(jj))
-    outfile = "test.nc"
+    outfile = "test"+outres+".nc"
        time = ocnf[0]->time
     delete(time@bounds)
-;if(1 .eq. 0)then
+
 ;----------------------------------------------------------------------
 ; set up the output netcdf file
 ;----------------------------------------------------------------------
@@ -213,14 +216,11 @@ begin
      outcdf->mask2d    = (/rgmask2d/) 
      outcdf->mask3d    = (/rgmask3d/) 
     end if
-;end if
 
-if(1 .eq. 0)then
 ;----------------------------------------------------------------------
 ;
 ;----------------------------------------------------------------------
- 
-    ;nv = 1
+
     do nv = 0,nvars-1
      varname = varlist(nv,0)
      vargrid = varlist(nv,1)
@@ -230,7 +230,7 @@ if(1 .eq. 0)then
     
     ocnvar = ocnf[ii]->$varname$
      ndims = dimsizes(dimsizes(ocnvar))
-     print(ndims+"   "+dimsizes(ocnvar))
+     ;print(ndims+"   "+dimsizes(ocnvar))
 
      if(vargrid .ne. "Ct")then
       ; print error if the variable is not on the Ct grid
@@ -258,19 +258,13 @@ if(1 .eq. 0)then
 
      delete(ocnvar)
      delete(rgtt)     
-    ; nv
+    ; nv, loop over number of variables
     end do
 
-end if
-;if(1 .eq. 0)then
 ;----------------------------------------------------------------------
 ;
 ;----------------------------------------------------------------------
    
-    system("/bin/rm -f " + "vecs.nc")    ; remove if exists
-    testcdf  = addfile ("vecs.nc", "c")  ; open output file
-
-    nv = 0
    do nv = 0,nvpairs-1
      vecnames = veclist(nv,0,:)
      vecgrids = veclist(nv,1,:)
@@ -301,7 +295,7 @@ end if
      ;print(vecpairs)
 
      ; rotate
-     vecpairs = rotate_to_EW(vecpairs,cosrot,sinrot,nlevs)
+     ;vecpairs = rotate_to_EW(vecpairs,cosrot,sinrot,nlevs)
      ;print(vecpairs)
 
      ; remap
@@ -324,23 +318,19 @@ end if
       setfileoption(outcdf,"DefineMode",False)
     
       outcdf->$vecnames(n)$   = (/rgtt/)
-      ;delete(vecfld)
       delete(rgtt)
      end do
-      delete(uvel)
-      delete(vvel)
-      delete(ut)
-      delete(vt)
-      delete(vecfld)
-      delete(vecpairs)
-
-;end if
-
-    ; nv
+      delete([/uvel,vvel,ut,vt,vecfld,vecpairs/])
+      delete([/vecnames,vecgrids,vecmeth,vecdims/])
+    ; nv, loop over number of vector pairs
     end do
-   ; ii
+
+   ; ii, loop over files
    ;end do
-  ; jj
-  ;end do
+  ; jj, loop over destination grids
+   delete([/lat,lon,nlon,nlat/])
+   delete([/rgmask2d,rgmask3d/])
+  end do
+  print("One complete ocn file in " + (get_cpu_time() - begTime) + " seconds")
 exit
 end

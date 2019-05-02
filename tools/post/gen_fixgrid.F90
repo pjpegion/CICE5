@@ -48,6 +48,8 @@ program gen_fixgrid
 !     x-------x-------x 
 !
 !
+! SCRIP requires that the vertices be ordered counter-clockwise so that
+! the center grid point is always to the left of the vertex. Here,
 ! Vertices are defined counter-clockwise from upper right. Ct-grid vertices
 ! are located on the Bu grid; Cu vertices on the Cv grid, Cv vertices on the Cu
 ! grid and Bu vertices on the Ct grid. For example, for the Ct-grid, the vertices
@@ -72,7 +74,7 @@ program gen_fixgrid
 ! Ctand Cu grid must be set manually (note, these points are on land.) The top of 
 ! the grid also requires special treatment because the required verticies are located
 ! across the tripole seam. This is accomplished by creating 1-d arrays which hold
-! the Ct and Cu grid point locations on the matched seam.
+! the Ct and Cu grid point locations across the matched seam.
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
   use param

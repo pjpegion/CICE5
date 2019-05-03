@@ -153,6 +153,7 @@ begin
      nlevs = dimsizes(z_l)
 
   ; get a 2 and 3 dimensional fields for creating the interpolation masks
+  ; the mask2d,mask3d contain 1's on land and 0's at valid points.
   mask2d = where(ismissing(ocnf[0]->SST),  1.0, 0.0)
   mask3d = where(ismissing(ocnf[0]->temp), 1.0, 0.0)
   ;printVarSummary(mask2d)
@@ -165,7 +166,7 @@ begin
       jj = 1
       ii = 0
 
-   do jj = 0,dimsizes(dstgrds)-1
+   ;do jj = 0,dimsizes(dstgrds)-1
     outres = "_"+dstgrds(jj)+"x"+dstgrds(jj)+"_MOM6"
 
    ; regrid a field to obtain the output xy dimensions
@@ -187,13 +188,11 @@ begin
    ; regrid the masks to obtain the interpolation masks. keep  the time
    ; dimension (even though they are constant) 
     wgtsfile = nemsrc+"tripole.mx025.Ct.to."+dsttype+dstgrds(jj)+".bilinear.nc"
-    rgmask2d = new((/1,nlat,nlon/),typeof(mask2d),default_fillvalue(typeof(mask2d)))
-    rgmask3d = new((/1,nlevs,nlat,nlon/),typeof(mask3d),default_fillvalue(typeof(mask2d)))
   
     ; the mask2d,mask3d contain 1's on land and 0's at valid points.
-    ; wherever the regridded mask > 0, land values have crept into the
-    ; field. remapped fields can then be masked with the interpolation
-    ; mask 
+    ; when remapped any mask value > 0, identifies land values that 
+    ; have crept into the field. remapped model fields are then
+    ; masked with this interpolation mask
     rgmask2d = ESMF_regrid_with_weights(mask2d, wgtsfile,False)
     rgmask3d = ESMF_regrid_with_weights(mask3d, wgtsfile,False)
 
@@ -300,6 +299,7 @@ begin
 ;
 ;----------------------------------------------------------------------
 
+    ;nv = 1
     do nv = 0,nvars-1
      varname = varlist(nv,0)
      vargrid = varlist(nv,1)
@@ -344,7 +344,8 @@ begin
 ;
 ;----------------------------------------------------------------------
    
-   do nv = 0,nvpairs-1
+   nv = 0
+   ;do nv = 0,nvpairs-1
      vecnames = veclist(nv,0,:)
      vecgrids = veclist(nv,1,:)
      vecmeth  = veclist(nv,2,:)
@@ -402,14 +403,14 @@ begin
       delete([/uvel,vvel,ut,vt,vecfld,vecpairs/])
       delete([/vecnames,vecgrids,vecmeth,vecdims/])
     ; nv, loop over number of vector pairs
-    end do
+    ;end do
 
    ; ii, loop over files
    ;end do
    ;jj, loop over destination grids
    delete([/lat,lon,nlon,nlat/])
    delete([/rgmask2d,rgmask3d/])
-  end do
+  ;end do
   print("One complete ocn file in " + (get_cpu_time() - begTime) + " seconds")
 exit
 end

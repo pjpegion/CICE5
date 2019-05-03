@@ -1,14 +1,8 @@
 ;------------------------------------------------------------------
 ; Denise.Worthen@noaa.gov (Feb 2019)
 ;
-; Post-processing of MOM6/CICE5 tripole grid output
-; to regular lat/lon grids 
-;
-; This script will regrid MOM6 ocean output on the
-; tripole grid to destination a set of rectilinear
-; grids using pre-computed ESMF weights to regrid the
-; listed fields to the destination grid and write the 
-; results to a new netCDF file
+; This is a version of ocnpost.ncl which reamps only the 
+; daily SST files
 ;
   load "$NCARG_ROOT/lib/ncarg/nclscripts/esmf/ESMF_regridding.ncl"
   load "ocnpost_add_functions.ncl"

@@ -5,7 +5,6 @@
 ; daily SST files
 ;
   load "$NCARG_ROOT/lib/ncarg/nclscripts/esmf/ESMF_regridding.ncl"
-  load "ocnpost_add_functions.ncl"
 
 ;----------------------------------------------------------------------
 begin
@@ -45,8 +44,10 @@ begin
           ocnf = addfiles(ocnfilelist,"r")
         nfiles = dimsizes(ocnfilelist)
 
-  ; get a 2 dimensional fields for creating the interpolation masks
+  ; get a 2 dimensional field for creating the interpolation masks
+  ; the mask2d contains 1's on land and 0's at valid points.
   mask2d = where(ismissing(ocnf[0]->sst),  1.0, 0.0)
+  ;printVarSummary(mask2d)
 
 ;----------------------------------------------------------------------
 ; loop over the output resolutions 
@@ -57,6 +58,7 @@ begin
 
    do jj = 0,dimsizes(dstgrds)-1
     outres = "_"+dstgrds(jj)+"x"+dstgrds(jj)+"_MOM6"
+   outgrid = dstgrds(jj)
 
    ; regrid a field to obtain the output xy dimensions
     wgtsfile = nemsrc+"tripole.mx025.Ct.to."+dsttype+dstgrds(jj)+".bilinear.nc"
@@ -74,15 +76,13 @@ begin
      delete(tt)
      delete(dims)
 
-   ; regrid the masks to obtain the interpolation masks. keep  the time
-   ; dimension (even though they are constant) 
+    ; regrid the masks to obtain the interpolation masks. 
+    ; the mask2d contain 1's on land and 0's at valid points.
+    ; when remapped any mask value > 0, identifies land values that 
+    ; have crept into the field. remapped model fields are then
+    ; masked with this interpolation mask
+
     wgtsfile = nemsrc+"tripole.mx025.Ct.to."+dsttype+dstgrds(jj)+".bilinear.nc"
-    rgmask2d = new((/1,nlat,nlon/),typeof(mask2d),default_fillvalue(typeof(mask2d)))
-  
-    ; the mask2d,mask3d contain 1's on land and 0's at valid points.
-    ; wherever the regridded mask > 0, land values have crept into the
-    ; field. remapped fields can then be masked with the interpolation
-    ; mask 
     rgmask2d = ESMF_regrid_with_weights(mask2d, wgtsfile,False)
 
     ; create the interpolation mask
@@ -94,7 +94,20 @@ begin
 
    ;do ii = 0,nfiles-1
      infile = ocnfilelist(ii)
-    ;outfile = create_outfile_name(infile,outres,dstgrds(jj))
+    ; create the output file name
+    outfile = infile
+    ; find the index where the actual filename begins
+     indstr = str_index_of_substr(outfile, "/", -1)
+    ; insert a sub-directory name
+    outfile = str_insert(outfile,outgrid+"/",indstr+1)
+    ; insert a string indicating regridding resolution
+    outfile = str_insert(outfile,outres,-4)
+    ; find the index where the actual filename begins
+     indstr = str_index_of_substr(outfile, "ocn", -1)
+    ; insert an 'r' after the leading occurence of 'ocn' 
+    ; to indicate regular grid
+    ;outfile = str_insert(outfile,"r",indstr+3)
+
     outfile = "SST"+outres+".nc"
        time = ocnf[0]->time
     delete(time@bounds)
@@ -154,7 +167,7 @@ begin
      vargrid = varlist(1)
      varmeth = varlist(2)
      vardims = varlist(3)
-     print(nv+"   "+varname+"  "+vargrid+"  "+varmeth)
+     print(varname+"  "+vargrid+"  "+varmeth)
     
     ocnvar = ocnf[ii]->$varname$
      ndims = dimsizes(dimsizes(ocnvar))

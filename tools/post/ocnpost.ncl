@@ -79,7 +79,6 @@
 ; (where the masking changes) by utilizing the correct masking procedure.
 ;
   load "$NCARG_ROOT/lib/ncarg/nclscripts/esmf/ESMF_regridding.ncl"
-  load "ocnpost_add_functions.ncl"
 
 ;----------------------------------------------------------------------
 begin
@@ -159,6 +158,13 @@ begin
   ;printVarSummary(mask2d)
   ;printVarSummary(mask3d)
 
+  ; create conformed rotation arrays to make vector rotations cleaner
+  sinrot2d=conform_dims(dimsizes(mask2d),sinrot,(/1,2/)) 
+  cosrot2d=conform_dims(dimsizes(mask2d),cosrot,(/1,2/)) 
+
+  sinrot3d=conform_dims(dimsizes(mask3d),sinrot,(/2,3/)) 
+  cosrot3d=conform_dims(dimsizes(mask3d),cosrot,(/2,3/)) 
+
 ;----------------------------------------------------------------------
 ; loop over the output resolutions 
 ;----------------------------------------------------------------------
@@ -166,8 +172,9 @@ begin
       jj = 1
       ii = 0
 
-   ;do jj = 0,dimsizes(dstgrds)-1
+   do jj = 0,dimsizes(dstgrds)-1
     outres = "_"+dstgrds(jj)+"x"+dstgrds(jj)+"_MOM6"
+   outgrid = dstgrds(jj)
 
    ; regrid a field to obtain the output xy dimensions
     wgtsfile = nemsrc+"tripole.mx025.Ct.to."+dsttype+dstgrds(jj)+".bilinear.nc"
@@ -185,14 +192,13 @@ begin
      delete(tt)
      delete(dims)
 
-   ; regrid the masks to obtain the interpolation masks. keep  the time
-   ; dimension (even though they are constant) 
-    wgtsfile = nemsrc+"tripole.mx025.Ct.to."+dsttype+dstgrds(jj)+".bilinear.nc"
-  
+    ; regrid the masks to obtain the interpolation masks. 
     ; the mask2d,mask3d contain 1's on land and 0's at valid points.
     ; when remapped any mask value > 0, identifies land values that 
     ; have crept into the field. remapped model fields are then
     ; masked with this interpolation mask
+
+    wgtsfile = nemsrc+"tripole.mx025.Ct.to."+dsttype+dstgrds(jj)+".bilinear.nc"
     rgmask2d = ESMF_regrid_with_weights(mask2d, wgtsfile,False)
     rgmask3d = ESMF_regrid_with_weights(mask3d, wgtsfile,False)
 
@@ -206,7 +212,20 @@ begin
 
    ;do ii = 0,nfiles-1
      infile = ocnfilelist(ii)
-    ;outfile = create_outfile_name(infile,outres,dstgrds(jj))
+    ; create the output file name
+    outfile = infile
+    ; find the index where the actual filename begins
+     indstr = str_index_of_substr(outfile, "/", -1)
+    ; insert a sub-directory name
+    outfile = str_insert(outfile,outgrid+"/",indstr+1)
+    ; insert a string indicating regridding resolution
+    outfile = str_insert(outfile,outres,-4)
+    ; find the index where the actual filename begins
+     indstr = str_index_of_substr(outfile, "ocn", -1)
+    ; insert an 'r' after the leading occurence of 'ocn' 
+    ; to indicate regular grid
+    ;outfile = str_insert(outfile,"r",indstr+3)
+
     outfile = "test"+outres+".nc"
        time = ocnf[0]->time
     delete(time@bounds)
@@ -344,8 +363,8 @@ begin
 ;
 ;----------------------------------------------------------------------
    
-   nv = 0
-   ;do nv = 0,nvpairs-1
+   ;nv = 0
+   do nv = 0,nvpairs-1
      vecnames = veclist(nv,0,:)
      vecgrids = veclist(nv,1,:)
      vecmeth  = veclist(nv,2,:)
@@ -375,8 +394,23 @@ begin
      ;print(vecpairs)
 
      ; rotate
-     vecpairs = rotate_to_EW(vecpairs,cosrot,sinrot,nlevs)
-     ;print(vecpairs)
+     ; first copy Metadata
+     urot = vecpairs[0]
+     vrot = vecpairs[1]
+     if(vecdims(0) .eq. "2")then
+       urot =   ut*cosrot2d +   vt*sinrot2d
+       vrot =   vt*cosrot2d -   ut*sinrot2d
+     else
+       urot =   ut*cosrot3d +   vt*sinrot3d
+       vrot =   vt*cosrot3d -   ut*sinrot3d
+     end if
+     ; change attribute to indicate these are now rotated velocities
+     urot@long_name=str_sub_str(urot@long_name,"X","Zonal")
+     vrot@long_name=str_sub_str(urot@long_name,"Y","Meridional")
+     ; copy back
+     vecpairs[0] = urot
+     vecpairs[1] = vrot
+     delete([/urot, vrot/])
 
      ; remap
      do n = 0,1
@@ -403,14 +437,14 @@ begin
       delete([/uvel,vvel,ut,vt,vecfld,vecpairs/])
       delete([/vecnames,vecgrids,vecmeth,vecdims/])
     ; nv, loop over number of vector pairs
-    ;end do
+    end do
 
    ; ii, loop over files
    ;end do
    ;jj, loop over destination grids
    delete([/lat,lon,nlon,nlat/])
    delete([/rgmask2d,rgmask3d/])
-  ;end do
+  end do
   print("One complete ocn file in " + (get_cpu_time() - begTime) + " seconds")
 exit
 end

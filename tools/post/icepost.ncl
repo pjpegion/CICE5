@@ -1,9 +1,14 @@
 ;------------------------------------------------------------------
 ; Denise.Worthen@noaa.gov (Feb 2019)
 ;
-; This is a version of ocnpost.ncl which remaps only the 
-; daily SST files
-;
+
+; This script will remap CICE5 output on the tripole grid to 
+; a set of rectilinear grids using pre-computed ESMF weights to remap 
+; the listed fields to the destination grid and write the results 
+; to a new netCDF file
+; 
+; See ocnpost.ncl for a complete description
+
   load "$NCARG_ROOT/lib/ncarg/nclscripts/esmf/ESMF_regridding.ncl"
 
 ;----------------------------------------------------------------------
@@ -12,42 +17,61 @@ begin
     output_masks = True
 
    ; specify a location to use
-       nemsrc     = "/scratch4/NCEPDEV/ocean/save/Denise.Worthen/NEMS_INPUT0.1/ocnicepost/"
+   ;    nemsrc     = "/scratch4/NCEPDEV/ocean/save/Denise.Worthen/NEMS_INPUT0.1/ocnicepost/"
+       nemsrc     = "/Users/Toby/Post/"
    ; interpolation methods
    methods        = (/"bilinear" ,"conserve"/)
    ; ocean model output location 
-           dirsrc = "/scratch3/NCEPDEV/stmp2/Denise.Worthen/BM1_ocn/"
+           dirsrc = "/Users/Toby/Post/BM1_ice/"
 
    ; destination grid sizes and name
       dsttype     = (/"rect."/)
       dstgrds     = (/"1p0", "0p5", "0p25"/)
 
    ; variables to be regridded with the native tripole stagger location
-   ; and dimensionality 
-   
-   varlist = (/ (/ "sst", "Ct", "bilinear", "2"/) \
-             /)
-   print(varlist)
 
+   varlist = (/ (/     "hi_h", "Ct", "bilinear"/) \
+               ,(/     "hs_h", "Ct", "bilinear"/) \
+               ,(/   "Tsfc_h", "Ct", "bilinear"/) \
+               ,(/   "aice_h", "Ct", "conserve"/) \
+               ,(/    "sst_h", "Ct", "bilinear"/) \
+             /)
      dims = dimsizes(varlist)
     nvars = dims(0)
    delete(dims)
+   ;print(varlist)
+
+    ; vectors to be regridded with the native tripole stagger location
+    ; and dimensionality 
+    ; note: vectors are always unstaggered using bilinear weights, but can
+    ; be remapped using conservative
+   nvpairs = 1
+   veclist = new( (/nvpairs,3,2/),"string")
+   veclist = (/ (/ (/"uvel_h", "vvel_h"/), (/"Bu", "Bu"/), (/"bilinear", "bilinear"/) /) \
+             /)
+   ;print(veclist)
 
    begTime = get_cpu_time()
 ;----------------------------------------------------------------------
 ; make a list of the directories and files from the run 
 ;----------------------------------------------------------------------
 
-   idate = "20120101"
+   idate = "20121001"
 
-   ocnfilelist = systemfunc("ls "+dirsrc+"gfs."+idate+"/00/"+"SST*.nc") 
-          ocnf = addfiles(ocnfilelist,"r")
-        nfiles = dimsizes(ocnfilelist)
+   icefilelist = systemfunc("ls "+dirsrc+"gfs."+idate+"/00/"+"ice*.nc")
+          icef = addfiles(icefilelist,"r")
+        nfiles = dimsizes(icefilelist)
 
-  ; get a 2 dimensional field for creating the interpolation masks
-  ; the mask2d contains 1's on land and 0's at valid points.
-  mask2d = where(ismissing(ocnf[0]->sst),  1.0, 0.0)
+  ; get the rotation angle 
+    angleT = icef[0]->ANGLET
+
+  ; get a 2 dimensional fields for creating the interpolation mask
+  ; the mask2d contain 1's on land and 0's at valid points.
+  mask2d = where(ismissing(icef[0]->sst_h),  1.0, 0.0)
   ;printVarSummary(mask2d)
+
+  ; create conformed rotation arrays to make vector rotations cleaner
+  angleT2d=conform_dims(dimsizes(mask2d),angleT,(/1,2/)) 
 
 ;----------------------------------------------------------------------
 ; loop over the output resolutions 
@@ -62,7 +86,7 @@ begin
 
    ; regrid a field to obtain the output xy dimensions
     wgtsfile = nemsrc+"tripole.mx025.Ct.to."+dsttype+dstgrds(jj)+".bilinear.nc"
-          tt = ESMF_regrid_with_weights(mask2d(0,:,:),wgtsfile,False)
+          tt = ESMF_regrid_with_weights(angleT,wgtsfile,False)
         tt!0 = "lat"
         tt!1 = "lon"
          lat = tt&lat
@@ -78,22 +102,21 @@ begin
 
     ; regrid the masks to obtain the interpolation masks. 
     ; the mask2d contain 1's on land and 0's at valid points.
-    ; when remapped any mask value > 0, identifies land values that 
+    ; when remapped, any mask value > 0 identifies land values that 
     ; have crept into the field. remapped model fields are then
     ; masked with this interpolation mask
 
     wgtsfile = nemsrc+"tripole.mx025.Ct.to."+dsttype+dstgrds(jj)+".bilinear.nc"
     rgmask2d = ESMF_regrid_with_weights(mask2d, wgtsfile,False)
-
     ; create the interpolation mask
     rgmask2d = where(rgmask2d .gt. 0.0, rgmask2d@_FillValue, 1.0)
 
 ;----------------------------------------------------------------------
-; loop over each file in the ocnfilelist
+; loop over each file in the icefilelist
 ;----------------------------------------------------------------------
 
    ;do ii = 0,nfiles-1
-     infile = ocnfilelist(ii)
+     infile = icefilelist(ii)
     ; create the output file name
     outfile = infile
     ; find the index where the actual filename begins
@@ -103,8 +126,8 @@ begin
     ; insert a string indicating regridding resolution
     outfile = str_insert(outfile,outres,-4)
     ; find the index where the actual filename begins
-     indstr = str_index_of_substr(outfile, "ocn", -1)
-    ; insert an 'r' after the leading occurence of 'ocn' 
+     indstr = str_index_of_substr(outfile, "ice", -1)
+    ; insert an 'r' after the leading occurence of 'ice' 
     ; to indicate regular grid
     outfile = str_insert(outfile,"r",indstr+3)
     ; check if the outgrid directory exists and create
@@ -115,7 +138,7 @@ begin
     end if
 
     ; retrieve the time stamp
-       time = ocnf[0]->time
+       time = icef[0]->time
     delete(time@bounds)
 
 ;----------------------------------------------------------------------
@@ -131,7 +154,7 @@ begin
     ; create global attributes of the file
     fAtt               = True            ; assign file attributes
     fAtt@creation_date = systemfunc ("date")
-    fAtt@source_file   = infile
+    fAtt@source_file   = infile        
     fileattdef( outcdf, fAtt )           ; copy file attributes    
 
     ; predefine the coordinate variables and their dimensionality
@@ -150,13 +173,28 @@ begin
     filevarattdef(outcdf,  "lat",  lat)             
     filevarattdef(outcdf,  "lon",  lon)            
 
-    ; there is only 1 variable 
-     varname = varlist(0)
-     vardims = varlist(3)
+    ; predefine variables
+    do nv = 0,nvars-1
+     varname = varlist(nv,0)
+       odims = (/"time", "lat", "lon"/)
+      print("creating variable "+varname+" in file")
+      filevardef(outcdf, varname, "float", odims)
+      delete(odims)
+    end do
+
+    do nv = 0,nvpairs-1
+     do nn = 0,1
+     vecname = veclist(nv,0,nn)
       odims = (/"time", "lat", "lon"/)
-     print("creating variable "+varname+" in file")
-     filevardef(outcdf, varname, "float", odims)
+     print("creating variable "+vecname+" in file")
+     filevardef(outcdf, vecname, "float", odims) 
      delete(odims)
+     end do
+    end do
+ 
+    if(output_masks)then
+     filevardef(outcdf, "mask2d", "float", (/"time", "lat", "lon"/)) 
+    end if
 
     ; explicitly exit file definition mode.
     setfileoption(outcdf,"DefineMode",False)
@@ -166,19 +204,24 @@ begin
     outcdf->lat    = (/lat/)
     outcdf->lon    = (/lon/) 
 
+    if(output_masks)then
+     outcdf->mask2d    = (/rgmask2d/) 
+    end if
+
 ;----------------------------------------------------------------------
-;
+; loop over nvars variables
 ;----------------------------------------------------------------------
 
-     varname = varlist(0)
-     vargrid = varlist(1)
-     varmeth = varlist(2)
-     vardims = varlist(3)
-     print(varname+"  "+vargrid+"  "+varmeth)
-    
-    ocnvar = ocnf[ii]->$varname$
-     ndims = dimsizes(dimsizes(ocnvar))
-     ;print(ndims+"   "+dimsizes(ocnvar))
+    ;nv = 1
+    do nv = 0,nvars-1
+     varname = varlist(nv,0)
+     vargrid = varlist(nv,1)
+     varmeth = varlist(nv,2)
+  
+     print(nv+"   "+varname+"  "+vargrid+"  "+varmeth)
+     icevar = icef[ii]->$varname$
+     ndims = dimsizes(dimsizes(icevar))
+     ;print(ndims+"   "+dimsizes(icevar))
 
      if(vargrid .ne. "Ct")then
       ; print error if the variable is not on the Ct grid
@@ -190,8 +233,8 @@ begin
      print("remapping "+varname+" to grid "+dsttype+dstgrds(jj))
      wgtsfile = nemsrc+"tripole.mx025.Ct.to."+dsttype+dstgrds(jj)+"."+varmeth+".nc"
 
-     rgtt = ESMF_regrid_with_weights(ocnvar,wgtsfile,False)
-     rgtt = where(ismissing(rgmask2d),ocnvar@_FillValue,rgtt)
+     rgtt = ESMF_regrid_with_weights(icevar,wgtsfile,False)
+     rgtt = where(ismissing(rgmask2d),icevar@_FillValue,rgtt)
 
      ; enter file definition mode to add variable attributes
      setfileoption(outcdf,"DefineMode",True)
@@ -200,13 +243,89 @@ begin
 
      outcdf->$varname$   = (/rgtt/)
 
-     delete(ocnvar)
-     delete(rgtt) 
+     delete(icevar)
+     delete(rgtt)
+ 
+    ; nv, loop over number of variables
+    end do
+
+;----------------------------------------------------------------------
+;
+;----------------------------------------------------------------------
+   
+   ;nv = 0
+   do nv = 0,nvpairs-1
+     vecnames = veclist(nv,0,:)
+     vecgrids = veclist(nv,1,:)
+     vecmeth  = veclist(nv,2,:)
+     print(nv+"   "+vecnames+"  "+vecgrids+"  "+vecmeth)
+
+     ; create a vector pair list
+     vecpairs = NewList("fifo")
+            n = 0
+         uvel = icef[ii]->$vecnames(n)$
+       vecfld = where(ismissing(uvel),0.0,uvel)
+        copy_VarAtts(uvel,vecfld)
+     print("unstagger "+vecnames(n)+" from "+vecgrids(n)+" to Ct")
+     wgtsfile = nemsrc+"tripole.mx025."+vecgrids(n)+".to.Ct.bilinear.nc"
+           ut = ESMF_regrid_with_weights(vecfld,wgtsfile,False)
+     delete(ut@remap)
+
+            n = 1
+         vvel = icef[ii]->$vecnames(n)$
+       vecfld = where(ismissing(vvel),0.0,vvel)
+        copy_VarAtts(vvel,vecfld)
+     print("unstagger "+vecnames(n)+" from "+vecgrids(n)+" to Ct")
+     wgtsfile = nemsrc+"tripole.mx025."+vecgrids(n)+".to.Ct.bilinear.nc"
+           vt = ESMF_regrid_with_weights(vecfld,wgtsfile,False)
+     delete(vt@remap)
+
+     ListAppend(vecpairs,ut)
+     ListAppend(vecpairs,vt)
+     ;print(vecpairs)
+
+     ; rotate
+     ; first copy Metadata
+     urot = vecpairs[0]
+     vrot = vecpairs[1]
+     urot = cos(angleT2d)*ut - sin(angleT2d)*vt
+     vrot = sin(angleT2d)*ut + cos(angleT2d)*vt
+
+     ; change attribute to indicate these are now rotated velocities
+     urot@long_name=str_sub_str(urot@long_name,"(x)","zonal")
+     vrot@long_name=str_sub_str(vrot@long_name,"(y)","meridional")
+     ; copy back
+     vecpairs[0] = urot
+     vecpairs[1] = vrot
+     delete([/urot, vrot/])
+
+     ; remap
+     do n = 0,1
+      vecfld = vecpairs[n]
+      ; regrid to dsttype+dstgrd with method
+      print("remapping "+vecnames(n)+" to grid "+dsttype+dstgrds(jj))
+      wgtsfile = nemsrc+"tripole.mx025.Ct.to."+dsttype+dstgrds(jj)+"."+vecmeth(n)+".nc"
+
+       rgtt = ESMF_regrid_with_weights(vecfld,wgtsfile,False)
+       rgtt = where(ismissing(rgmask2d),vecfld@_FillValue,rgtt)
+
+      ; enter file definition mode to add variable attributes
+      setfileoption(outcdf,"DefineMode",True)
+      filevarattdef(outcdf, vecnames(n), rgtt)                 
+      setfileoption(outcdf,"DefineMode",False)
     
+      outcdf->$vecnames(n)$   = (/rgtt/)
+      delete(rgtt)
+     end do
+      delete([/uvel,vvel,ut,vt,vecfld,vecpairs/])
+      delete([/vecnames,vecgrids,vecmeth/])
+    ; nv, loop over number of vector pairs
+    end do
+  
 ;----------------------------------------------------------------------
 ; close the outcdf and continue through filelist
 ;----------------------------------------------------------------------
-
+   
    delete(outcdf)
 
    ; ii, loop over files
@@ -215,6 +334,6 @@ begin
    delete([/lat,lon,nlon,nlat/])
    delete([/rgmask2d/])
   end do
-  print("One complete ocn file in " + (get_cpu_time() - begTime) + " seconds")
+  print("One complete ice file in " + (get_cpu_time() - begTime) + " seconds")
 exit
 end

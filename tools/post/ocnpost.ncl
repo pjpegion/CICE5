@@ -86,19 +86,27 @@ begin
     output_masks = True
 
    ; specify a location to use
-       nemsrc     = "/scratch4/NCEPDEV/ocean/save/Denise.Worthen/NEMS_INPUT0.1/ocnicepost/"
+   ;    nemsrc     = "/scratch4/NCEPDEV/ocean/save/Denise.Worthen/NEMS_INPUT0.1/ocnicepost/"
+       nemsrc     = "/Users/Toby/Post/"
    ; interpolation methods
    methods        = (/"bilinear" ,"conserve"/)
    ; ocean model output location 
-           dirsrc = "/scratch3/NCEPDEV/stmp2/Denise.Worthen/BM1_ocn/"
+   ;        dirsrc = "/scratch3/NCEPDEV/stmp2/Denise.Worthen/BM1_ocn/"
+           dirsrc = "/Users/Toby/Post/BM1_ocn/"
+          ; dirsrc = "/Users/Toby/Post/BM2_ocn/"
 
    ; destination grid sizes and name
       dsttype     = (/"rect."/)
-      dstgrds     = (/"0p25", "0p5", "1p0"/)
+      dstgrds     = (/"1p0", "0p5", "0p25"/)
 
    ; variables to be regridded with the native tripole stagger location
    ; and dimensionality 
-   
+   ; first BM contained only field "mld", which was actually ePBL
+   ; the remaining BMs contain ePBL, MLD_003 and MLD_0125 
+   ; the following NCO command will be issued to rename the variable
+   ; mld to ePBL if the variable mld is found
+   ncocmd = "ncrename -O -v mld,ePBL "
+
    varlist = (/ (/      "SSH", "Ct", "bilinear", "2"/) \
                ,(/      "SST", "Ct", "bilinear", "2"/) \
                ,(/      "SSS", "Ct", "bilinear", "2"/) \
@@ -114,7 +122,14 @@ begin
                ,(/    "fprec", "Ct", "conserve", "2"/) \
                ,(/"LwLatSens", "Ct", "conserve", "2"/) \
                ,(/ "Heat_PmE", "Ct", "conserve", "2"/) \
+               ,(/      "mld", "Ct", "bilinear", "2"/) \
+               ,(/     "ePBL", "Ct", "bilinear", "2"/) \
+               ,(/  "MLD_003", "Ct", "bilinear", "2"/) \
+               ,(/ "MLD_0125", "Ct", "bilinear", "2"/) \
              /)
+     dims = dimsizes(varlist)
+    nvars = dims(0)
+   delete(dims)
    ;print(varlist)
 
     ; vectors to be regridded with the native tripole stagger location
@@ -129,10 +144,6 @@ begin
              /)
    ;print(veclist)
 
-     dims = dimsizes(varlist)
-    nvars = dims(0)
-   delete(dims)
-
    begTime = get_cpu_time()
 ;----------------------------------------------------------------------
 ; make a list of the directories and files from the run 
@@ -140,13 +151,23 @@ begin
 
    idate = "20120101"
 
-   ocnfilelist = systemfunc("ls "+dirsrc+"gfs."+idate+"/00/"+"ocn*.nc") 
+   ocnfilelist = systemfunc("ls "+dirsrc+"gfs."+idate+"/00/"+"ocn*.nc")
           ocnf = addfiles(ocnfilelist,"r")
         nfiles = dimsizes(ocnfilelist)
 
   ; get the rotation angles and vertical grid from the first file
+  ; two different name were used for the angles, either sinrot,cosrot 
+  ; or sin_rot,cos_rot
+   if(isfilevar(ocnf[0],"sin_rot"))then
+    sinrot = ocnf[0]->sin_rot
+   else
     sinrot = ocnf[0]->sinrot
+   end if
+   if(isfilevar(ocnf[0],"cos_rot"))then
+    cosrot = ocnf[0]->cos_rot
+   else
     cosrot = ocnf[0]->cosrot
+   end if
        z_l = ocnf[0]->z_l
        z_i = ocnf[0]->z_i
      nlevs = dimsizes(z_l)
@@ -165,6 +186,20 @@ begin
   sinrot3d=conform_dims(dimsizes(mask3d),sinrot,(/2,3/)) 
   cosrot3d=conform_dims(dimsizes(mask3d),cosrot,(/2,3/)) 
 
+  ; check for variables in file. this is only required because
+  ; of the missing/misnamed MLD variables in the first BM
+  ; only the varlist is checked, since it is assumed there are
+  ; no other variables missing after the first benchmark
+  valid = new((/nvars/),"logical")
+  valid = False
+  do nv = 0,nvars-1
+   varname = varlist(nv,0)
+   if(isfilevar(ocnf[0],varname))then
+    valid(nv) = True
+   end if
+  print(varlist(nv,0)+"   "+valid(nv))
+  end do
+
 ;----------------------------------------------------------------------
 ; loop over the output resolutions 
 ;----------------------------------------------------------------------
@@ -173,7 +208,7 @@ begin
       ii = 0
 
    do jj = 0,dimsizes(dstgrds)-1
-    outres = "_"+dstgrds(jj)+"x"+dstgrds(jj)+"_MOM6"
+    outres = "_"+dstgrds(jj)+"x"+dstgrds(jj)
    outgrid = dstgrds(jj)
 
    ; regrid a field to obtain the output xy dimensions
@@ -194,7 +229,7 @@ begin
 
     ; regrid the masks to obtain the interpolation masks. 
     ; the mask2d,mask3d contain 1's on land and 0's at valid points.
-    ; when remapped any mask value > 0, identifies land values that 
+    ; when remapped, any mask value > 0 identifies land values that 
     ; have crept into the field. remapped model fields are then
     ; masked with this interpolation mask
 
@@ -224,9 +259,15 @@ begin
      indstr = str_index_of_substr(outfile, "ocn", -1)
     ; insert an 'r' after the leading occurence of 'ocn' 
     ; to indicate regular grid
-    ;outfile = str_insert(outfile,"r",indstr+3)
+    outfile = str_insert(outfile,"r",indstr+3)
+    ; check if the outgrid directory exists and create
+    ; it if it does not
+    ret = systemfunc("test -d "+dirsrc+"gfs."+idate+"/00/"+outgrid+"; echo $?")
+    if(ret .eq. 1)then
+     system("mkdir "+dirsrc+"gfs."+idate+"/00/"+outgrid)
+    end if
 
-    outfile = "test"+outres+".nc"
+    ; retrieve the time stamp
        time = ocnf[0]->time
     delete(time@bounds)
 
@@ -242,7 +283,8 @@ begin
 
     ; create global attributes of the file
     fAtt               = True            ; assign file attributes
-    fAtt@creation_date = systemfunc ("date")        
+    fAtt@creation_date = systemfunc ("date")
+    fAtt@source_file   = infile        
     fileattdef( outcdf, fAtt )           ; copy file attributes    
 
     ; predefine the coordinate variables and their dimensionality
@@ -265,17 +307,20 @@ begin
     filevarattdef(outcdf,  "lat",  lat)             
     filevarattdef(outcdf,  "lon",  lon)            
 
+    ; predefine variables
     do nv = 0,nvars-1
      varname = varlist(nv,0)
      vardims = varlist(nv,3)
-     if(vardims .eq. "2")then
-      odims = (/"time", "lat", "lon"/)
-     else
-      odims = (/"time", "z_l", "lat", "lon"/)
+     if(valid(nv))then
+      if(vardims .eq. "2")then
+       odims = (/"time", "lat", "lon"/)
+      else
+       odims = (/"time", "z_l", "lat", "lon"/)
+      end if
+      print("creating variable "+varname+" in file")
+      filevardef(outcdf, varname, "float", odims)
+      delete(odims)
      end if
-     print("creating variable "+varname+" in file")
-     filevardef(outcdf, varname, "float", odims)
-     delete(odims)
     end do
 
     do nv = 0,nvpairs-1
@@ -315,18 +360,18 @@ begin
     end if
 
 ;----------------------------------------------------------------------
-;
+; loop over nvars variables
 ;----------------------------------------------------------------------
 
-    ;nv = 1
     do nv = 0,nvars-1
      varname = varlist(nv,0)
      vargrid = varlist(nv,1)
      varmeth = varlist(nv,2)
      vardims = varlist(nv,3)
-     print(nv+"   "+varname+"  "+vargrid+"  "+varmeth)
-    
-    ocnvar = ocnf[ii]->$varname$
+  
+     if(valid(nv))then
+      print(nv+"   "+varname+"  "+vargrid+"  "+varmeth)
+      ocnvar = ocnf[ii]->$varname$
      ndims = dimsizes(dimsizes(ocnvar))
      ;print(ndims+"   "+dimsizes(ocnvar))
 
@@ -355,7 +400,10 @@ begin
      outcdf->$varname$   = (/rgtt/)
 
      delete(ocnvar)
-     delete(rgtt)     
+     delete(rgtt)
+ 
+     ; variable exists    
+     end if
     ; nv, loop over number of variables
     end do
 
@@ -363,7 +411,7 @@ begin
 ;
 ;----------------------------------------------------------------------
    
-   ;nv = 0
+   ;nv = 2
    do nv = 0,nvpairs-1
      vecnames = veclist(nv,0,:)
      vecgrids = veclist(nv,1,:)
@@ -380,6 +428,7 @@ begin
      print("unstagger "+vecnames(n)+" from "+vecgrids(n)+" to Ct")
      wgtsfile = nemsrc+"tripole.mx025."+vecgrids(n)+".to.Ct.bilinear.nc"
            ut = ESMF_regrid_with_weights(vecfld,wgtsfile,False)
+     delete(ut@remap)
 
             n = 1
          vvel = ocnf[ii]->$vecnames(n)$
@@ -388,6 +437,7 @@ begin
      print("unstagger "+vecnames(n)+" from "+vecgrids(n)+" to Ct")
      wgtsfile = nemsrc+"tripole.mx025."+vecgrids(n)+".to.Ct.bilinear.nc"
            vt = ESMF_regrid_with_weights(vecfld,wgtsfile,False)
+     delete(vt@remap)
 
      ListAppend(vecpairs,ut)
      ListAppend(vecpairs,vt)
@@ -406,7 +456,7 @@ begin
      end if
      ; change attribute to indicate these are now rotated velocities
      urot@long_name=str_sub_str(urot@long_name,"X","Zonal")
-     vrot@long_name=str_sub_str(urot@long_name,"Y","Meridional")
+     vrot@long_name=str_sub_str(vrot@long_name,"Y","Meridional")
      ; copy back
      vecpairs[0] = urot
      vecpairs[1] = vrot
@@ -420,6 +470,7 @@ begin
       wgtsfile = nemsrc+"tripole.mx025.Ct.to."+dsttype+dstgrds(jj)+"."+vecmeth(n)+".nc"
 
        rgtt = ESMF_regrid_with_weights(vecfld,wgtsfile,False)
+      print(rgtt@remap)
       if(vecdims(n) .eq. "2")then
        rgtt = where(ismissing(rgmask2d),vecfld@_FillValue,rgtt)
       else
@@ -438,6 +489,21 @@ begin
       delete([/vecnames,vecgrids,vecmeth,vecdims/])
     ; nv, loop over number of vector pairs
     end do
+  
+;----------------------------------------------------------------------
+; close the outcdf and continue through filelist
+;----------------------------------------------------------------------
+   
+   delete(outcdf)
+   ; rename mld to ePBL if required
+  do nv = 0,nvars-1
+   varname = varlist(nv,0)
+    if(varname .eq. "mld" .and. valid(nv))then
+     print("Renaming mld to ePBL")
+     print(ncocmd+"  "+outfile)
+     system(ncocmd+"  "+outfile)
+    end if
+   end do
 
    ; ii, loop over files
    ;end do

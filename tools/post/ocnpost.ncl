@@ -83,7 +83,7 @@
 ;----------------------------------------------------------------------
 begin
 
-    output_masks = True
+    output_masks = False
 
    ; specify a location to use
    ;    nemsrc     = "/scratch4/NCEPDEV/ocean/save/Denise.Worthen/NEMS_INPUT0.1/ocnicepost/"
@@ -103,8 +103,8 @@ begin
    ; and dimensionality 
    ; first BM contained only field "mld", which was actually ePBL
    ; the remaining BMs contain ePBL, MLD_003 and MLD_0125 
-   ; the following NCO command will be issued to rename the variable
-   ; mld to ePBL if the variable mld is found
+   ; the following NCO command will be issued at the end 
+   ; to rename the variable mld to ePBL if the variable mld is found
    ncocmd = "ncrename -O -v mld,ePBL "
 
    varlist = (/ (/      "SSH", "Ct", "bilinear", "2"/) \
@@ -143,6 +143,15 @@ begin
               , (/ (/ "taux",  "tauy"/), (/"Cu", "Cv"/), (/"conserve", "conserve"/), (/"2", "2"/) /) \
              /)
    ;print(veclist)
+
+   ; define an axis for the depths of isothermal surfaces
+         z_T = (/28.0, 25.0, 20.0, 15.0, 10.0, 5.0, 2.5/)
+   z_T@units = "degC"
+       z_T!0 = "z_T"
+         nTd = dimsizes(z_T)
+   ; a variable list for the depth of z_T isotherms 
+   isoTvar = (/ (/"dp_isoT_sfc", "Ct", "bilinear", "3"/) \
+              /)
 
    begTime = get_cpu_time()
 ;----------------------------------------------------------------------
@@ -221,6 +230,7 @@ begin
         dims = dimsizes(tt)
         nlat = dims(0)
         nlon = dims(1)
+
      print("fields will be remapped to destination grid size "\
            +nlon+"  "+nlat)
   
@@ -240,6 +250,10 @@ begin
     ; create the interpolation mask
     rgmask2d = where(rgmask2d .gt. 0.0, rgmask2d@_FillValue, 1.0)
     rgmask3d = where(rgmask3d .gt. 0.0, rgmask3d@_FillValue, 1.0)
+
+    ; conformed depth array 
+    depth = conform_dims(dimsizes(mask3d), z_l, (/1/))
+    print(dimsizes(depth))
 
 ;----------------------------------------------------------------------
 ; loop over each file in the ocnfilelist
@@ -288,22 +302,24 @@ begin
     fileattdef( outcdf, fAtt )           ; copy file attributes    
 
     ; predefine the coordinate variables and their dimensionality
-    dimNames = (/"time", "z_l",   "z_i", "lat", "lon"/)  
-    dimSizes = (/ -1   , nlevs, nlevs+1,  nlat,  nlon/) 
-    dimUnlim = (/ True , False,   False, False, False/)   
+    dimNames = (/"time", "z_l",   "z_i",  "z_T",  "lat", "lon"/)  
+    dimSizes = (/ -1   , nlevs, nlevs+1,    nTd,   nlat,  nlon/) 
+    dimUnlim = (/ True , False,   False,  False,  False, False/)   
     filedimdef(outcdf,dimNames,dimSizes,dimUnlim)
 
     ; predefine the the dimensionality of the variables to be written out
-    filevardef(outcdf, "time", typeof(time), getvardims(time)) 
-    filevardef(outcdf,  "z_l",  typeof(z_l),  getvardims(z_l))                           
-    filevardef(outcdf,  "z_i",  typeof(z_i),  getvardims(z_i))                           
-    filevardef(outcdf,  "lat",  typeof(lat),  getvardims(lat))                          
-    filevardef(outcdf,  "lon",  typeof(lon),  getvardims(lon))                          
+    filevardef(outcdf,  "time", typeof(time), getvardims(time)) 
+    filevardef(outcdf,   "z_l",  typeof(z_l),  getvardims(z_l))                           
+    filevardef(outcdf,   "z_i",  typeof(z_i),  getvardims(z_i))
+    filevardef(outcdf,   "z_T",  typeof(z_T),  getvardims(z_T))
+    filevardef(outcdf,   "lat",  typeof(lat),  getvardims(lat))                          
+    filevardef(outcdf,   "lon",  typeof(lon),  getvardims(lon))                          
 
     ; Copy attributes associated with each variable to the file
     filevarattdef(outcdf, "time", time)                 
     filevarattdef(outcdf,  "z_l",  z_l)               
     filevarattdef(outcdf,  "z_i",  z_i)               
+    filevarattdef(outcdf,  "z_T",  z_T)               
     filevarattdef(outcdf,  "lat",  lat)             
     filevarattdef(outcdf,  "lon",  lon)            
 
@@ -339,6 +355,13 @@ begin
      end do
     end do
  
+   ; the depth of the isotherm variable
+    varname = isoTvar(0)
+      odims = (/"time", "z_T", "lat", "lon"/)
+    print("creating variable "+varname+" in file")
+    filevardef(outcdf, varname, "float", odims) 
+    delete(odims)
+
     if(output_masks)then
      filevardef(outcdf, "mask2d", "float", (/"time", "lat", "lon"/)) 
      filevardef(outcdf, "mask3d", "float", (/"time", "z_l", "lat", "lon"/)) 
@@ -351,6 +374,7 @@ begin
     outcdf->time   = (/time/)     
     outcdf->z_l    = (/z_l/)     
     outcdf->z_i    = (/z_i/)     
+    outcdf->z_T    = (/z_T/)     
     outcdf->lat    = (/lat/)
     outcdf->lon    = (/lon/) 
 
@@ -490,6 +514,41 @@ begin
     ; nv, loop over number of vector pairs
     end do
   
+;----------------------------------------------------------------------
+;
+;----------------------------------------------------------------------
+
+    varname = isoTvar(0)
+    vargrid = isoTvar(1)
+    varmeth = isoTvar(2)
+    vardims = isoTvar(3)
+
+    ocnvar = ocnf[ii]->temp
+    dpisoT = tofloat(int2p_n_Wrap(ocnvar,depth,z_T,0,1))
+    dpisoT@long_name = "depth of the isothermal surface"
+    dpisoT@units     = "m"
+
+    ; a mask for where dpisoT is missing (ie, not found)
+       maskT = where(ismissing(dpisoT), 1.0, 0.0)
+    wgtsfile = nemsrc+"tripole.mx025.Ct.to."+dsttype+dstgrds(jj)+".bilinear.nc"
+     rgmaskT = ESMF_regrid_with_weights(maskT, wgtsfile,False)
+    ; create the interpolation mask
+    rgmaskT = where(rgmaskT .gt. 0.0, rgmaskT@_FillValue, 1.0)
+
+    ; remap the depth of the isotherm fields
+       rgtt = ESMF_regrid_with_weights(dpisoT,wgtsfile,False)
+    ; mask
+       rgtt = where(ismissing(rgmaskT),dpisoT@_FillValue,rgtt)
+
+    ; enter file definition mode to add variable attributes
+    setfileoption(outcdf,"DefineMode",True)
+    filevarattdef(outcdf, varname, rgtt)
+    setfileoption(outcdf,"DefineMode",False)
+
+    outcdf->$varname$   = (/rgtt/)
+
+    delete([/ocnvar, dpisoT, maskT, rgmaskT, rgtt/])
+
 ;----------------------------------------------------------------------
 ; close the outcdf and continue through filelist
 ;----------------------------------------------------------------------

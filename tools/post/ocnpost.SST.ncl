@@ -9,8 +9,6 @@
 ;----------------------------------------------------------------------
 begin
 
-    output_masks = True
-
    ; specify a location to use
        nemsrc     = "/scratch4/NCEPDEV/ocean/save/Denise.Worthen/NEMS_INPUT0.1/ocnicepost/"
    ; interpolation methods
@@ -27,7 +25,7 @@ begin
    
    varlist = (/ (/ "sst", "Ct", "bilinear", "2"/) \
              /)
-   print(varlist)
+   ;print(varlist)
 
      dims = dimsizes(varlist)
     nvars = dims(0)
@@ -92,8 +90,10 @@ begin
 ; loop over each file in the ocnfilelist
 ;----------------------------------------------------------------------
 
+   do ii = 0,2
    ;do ii = 0,nfiles-1
      infile = ocnfilelist(ii)
+    print("working on "+infile)
     ; create the output file name
     outfile = infile
     ; find the index where the actual filename begins
@@ -103,8 +103,8 @@ begin
     ; insert a string indicating regridding resolution
     outfile = str_insert(outfile,outres,-4)
     ; find the index where the actual filename begins
-     indstr = str_index_of_substr(outfile, "ocn", -1)
-    ; insert an 'r' after the leading occurence of 'ocn' 
+     indstr = str_index_of_substr(outfile, "SST", -1)
+    ; insert an 'r' after the leading occurence of 'SST' 
     ; to indicate regular grid
     outfile = str_insert(outfile,"r",indstr+3)
     ; check if the outgrid directory exists and create
@@ -154,7 +154,7 @@ begin
      varname = varlist(0)
      vardims = varlist(3)
       odims = (/"time", "lat", "lon"/)
-     print("creating variable "+varname+" in file")
+     ;print("creating variable "+varname+" in file")
      filevardef(outcdf, varname, "float", odims)
      delete(odims)
 
@@ -174,7 +174,7 @@ begin
      vargrid = varlist(1)
      varmeth = varlist(2)
      vardims = varlist(3)
-     print(varname+"  "+vargrid+"  "+varmeth)
+     ;print(varname+"  "+vargrid+"  "+varmeth)
     
     ocnvar = ocnf[ii]->$varname$
      ndims = dimsizes(dimsizes(ocnvar))
@@ -187,7 +187,7 @@ begin
      end if
 
      ; regrid to dsttype+dstgrd with method
-     print("remapping "+varname+" to grid "+dsttype+dstgrds(jj))
+     ;print("remapping "+varname+" to grid "+dsttype+dstgrds(jj))
      wgtsfile = nemsrc+"tripole.mx025.Ct.to."+dsttype+dstgrds(jj)+"."+varmeth+".nc"
 
      rgtt = ESMF_regrid_with_weights(ocnvar,wgtsfile,False)
@@ -210,11 +210,11 @@ begin
    delete(outcdf)
 
    ; ii, loop over files
-   ;end do
+   end do
    ;jj, loop over destination grids
    delete([/lat,lon,nlon,nlat/])
    delete([/rgmask2d/])
   end do
-  print("One complete ocn file in " + (get_cpu_time() - begTime) + " seconds")
+  print("One complete SST file in " + (get_cpu_time() - begTime) + " seconds")
 exit
 end

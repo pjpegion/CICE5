@@ -1,7 +1,6 @@
 ;------------------------------------------------------------------
 ; Denise.Worthen@noaa.gov (Feb 2019)
 ;
-
 ; This script will remap CICE5 output on the tripole grid to 
 ; a set of rectilinear grids using pre-computed ESMF weights to remap 
 ; the listed fields to the destination grid and write the results 
@@ -17,12 +16,11 @@ begin
     output_masks = True
 
    ; specify a location to use
-   ;    nemsrc     = "/scratch4/NCEPDEV/ocean/save/Denise.Worthen/NEMS_INPUT0.1/ocnicepost/"
-       nemsrc     = "/Users/Toby/Post/"
+       nemsrc     = "/scratch4/NCEPDEV/ocean/save/Denise.Worthen/NEMS_INPUT0.1/ocnicepost/"
    ; interpolation methods
    methods        = (/"bilinear" ,"conserve"/)
    ; ocean model output location 
-           dirsrc = "/Users/Toby/Post/BM1_ice/"
+           dirsrc = "/scratch3/NCEPDEV/stmp2/Denise.Worthen/BM1_ice/"
 
    ; destination grid sizes and name
       dsttype     = (/"rect."/)
@@ -108,6 +106,17 @@ begin
 
     wgtsfile = nemsrc+"tripole.mx025.Ct.to."+dsttype+dstgrds(jj)+".bilinear.nc"
     rgmask2d = ESMF_regrid_with_weights(mask2d, wgtsfile,False)
+
+    if(output_masks)then
+     testfile = "masks_"+dstgrds(jj)+".nc"
+     system("/bin/rm -f "+testfile)
+     ; create
+     testcdf = addfile(testfile,"c")
+     testcdf->rgmask2d = rgmask2d
+     ; close
+     delete(testcdf)
+    end if
+
     ; create the interpolation mask
     rgmask2d = where(rgmask2d .gt. 0.0, rgmask2d@_FillValue, 1.0)
 
@@ -115,8 +124,10 @@ begin
 ; loop over each file in the icefilelist
 ;----------------------------------------------------------------------
 
+   do ii = 0,2
    ;do ii = 0,nfiles-1
      infile = icefilelist(ii)
+     print("working on "+infile)
     ; create the output file name
     outfile = infile
     ; find the index where the actual filename begins
@@ -177,7 +188,7 @@ begin
     do nv = 0,nvars-1
      varname = varlist(nv,0)
        odims = (/"time", "lat", "lon"/)
-      print("creating variable "+varname+" in file")
+      ;print("creating variable "+varname+" in file")
       filevardef(outcdf, varname, "float", odims)
       delete(odims)
     end do
@@ -186,16 +197,12 @@ begin
      do nn = 0,1
      vecname = veclist(nv,0,nn)
       odims = (/"time", "lat", "lon"/)
-     print("creating variable "+vecname+" in file")
+     ;print("creating variable "+vecname+" in file")
      filevardef(outcdf, vecname, "float", odims) 
      delete(odims)
      end do
     end do
  
-    if(output_masks)then
-     filevardef(outcdf, "mask2d", "float", (/"time", "lat", "lon"/)) 
-    end if
-
     ; explicitly exit file definition mode.
     setfileoption(outcdf,"DefineMode",False)
 
@@ -203,10 +210,6 @@ begin
     outcdf->time   = (/time/)     
     outcdf->lat    = (/lat/)
     outcdf->lon    = (/lon/) 
-
-    if(output_masks)then
-     outcdf->mask2d    = (/rgmask2d/) 
-    end if
 
 ;----------------------------------------------------------------------
 ; loop over nvars variables
@@ -218,7 +221,7 @@ begin
      vargrid = varlist(nv,1)
      varmeth = varlist(nv,2)
   
-     print(nv+"   "+varname+"  "+vargrid+"  "+varmeth)
+     ;print(nv+"   "+varname+"  "+vargrid+"  "+varmeth)
      icevar = icef[ii]->$varname$
      ndims = dimsizes(dimsizes(icevar))
      ;print(ndims+"   "+dimsizes(icevar))
@@ -230,7 +233,7 @@ begin
      end if
 
      ; regrid to dsttype+dstgrd with method
-     print("remapping "+varname+" to grid "+dsttype+dstgrds(jj))
+     ;print("remapping "+varname+" to grid "+dsttype+dstgrds(jj))
      wgtsfile = nemsrc+"tripole.mx025.Ct.to."+dsttype+dstgrds(jj)+"."+varmeth+".nc"
 
      rgtt = ESMF_regrid_with_weights(icevar,wgtsfile,False)
@@ -258,7 +261,7 @@ begin
      vecnames = veclist(nv,0,:)
      vecgrids = veclist(nv,1,:)
      vecmeth  = veclist(nv,2,:)
-     print(nv+"   "+vecnames+"  "+vecgrids+"  "+vecmeth)
+     ;print(nv+"   "+vecnames+"  "+vecgrids+"  "+vecmeth)
 
      ; create a vector pair list
      vecpairs = NewList("fifo")
@@ -266,7 +269,7 @@ begin
          uvel = icef[ii]->$vecnames(n)$
        vecfld = where(ismissing(uvel),0.0,uvel)
         copy_VarAtts(uvel,vecfld)
-     print("unstagger "+vecnames(n)+" from "+vecgrids(n)+" to Ct")
+     ;print("unstagger "+vecnames(n)+" from "+vecgrids(n)+" to Ct")
      wgtsfile = nemsrc+"tripole.mx025."+vecgrids(n)+".to.Ct.bilinear.nc"
            ut = ESMF_regrid_with_weights(vecfld,wgtsfile,False)
      delete(ut@remap)
@@ -275,7 +278,7 @@ begin
          vvel = icef[ii]->$vecnames(n)$
        vecfld = where(ismissing(vvel),0.0,vvel)
         copy_VarAtts(vvel,vecfld)
-     print("unstagger "+vecnames(n)+" from "+vecgrids(n)+" to Ct")
+     ;print("unstagger "+vecnames(n)+" from "+vecgrids(n)+" to Ct")
      wgtsfile = nemsrc+"tripole.mx025."+vecgrids(n)+".to.Ct.bilinear.nc"
            vt = ESMF_regrid_with_weights(vecfld,wgtsfile,False)
      delete(vt@remap)
@@ -303,7 +306,7 @@ begin
      do n = 0,1
       vecfld = vecpairs[n]
       ; regrid to dsttype+dstgrd with method
-      print("remapping "+vecnames(n)+" to grid "+dsttype+dstgrds(jj))
+      ;print("remapping "+vecnames(n)+" to grid "+dsttype+dstgrds(jj))
       wgtsfile = nemsrc+"tripole.mx025.Ct.to."+dsttype+dstgrds(jj)+"."+vecmeth(n)+".nc"
 
        rgtt = ESMF_regrid_with_weights(vecfld,wgtsfile,False)
@@ -329,7 +332,7 @@ begin
    delete(outcdf)
 
    ; ii, loop over files
-   ;end do
+   end do
    ;jj, loop over destination grids
    delete([/lat,lon,nlon,nlat/])
    delete([/rgmask2d/])

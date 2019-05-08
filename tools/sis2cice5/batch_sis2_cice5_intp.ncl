@@ -28,15 +28,17 @@
 begin
 
 ; define some constants
-saltmax = 3.2d0
-   nsal = 0.407d0
-   msal = 0.573d0
-     pi = atan(1.0d0)*4.0d0
-   rhoi =  917.d0
-   rhos =  330.d0
- cp_ice = 2106.d0
- cp_ocn = 4218.d0
- Lfresh = 3.34d5
+  saltmax = 3.2d0
+min_salin = 0.10d0
+ depressT = 0.054d0
+     nsal = 0.407d0
+     msal = 0.573d0
+       pi = atan(1.0d0)*4.0d0
+     rhoi =  917.d0
+     rhos =  330.d0
+   cp_ice = 2106.d0
+   cp_ocn = 4218.d0
+   Lfresh = 3.34d5
 
 ;************************************************
 ; set up for directory names for batch
@@ -73,7 +75,8 @@ print(dates)
 ;************************************************
 
 ;nd = 10-1
-do  nd = 0,ndates-1
+nd = 1
+;do  nd = 0,ndates-1
 
  cdate = dates(nd) 
  ; specify the name of the SIS2 restart file
@@ -216,10 +219,14 @@ salinz = new((/nilyr2/),double)
 do l = 0,nilyr2-1
             zn = (int2dble(l+1)-0.5d0)/int2dble(nilyr2)
      salinz(l) = (saltmax/2.d0)*(1.d0-cos(pi*zn^(nsal/(msal+zn))))
+;     salinz(l) = where(salinz(l) .lt. min_salin, min_salin, salinz(l))
 ; replace SIS2 constant profile
  sice(l,:,:,:) = salinz(l)
 end do
+;print(salinz)
+;print(-salinz*depressT)
 Tmltz = salinz / (-18.48 + (0.01848*salinz))
+;print(Tmltz)
 
 ; get Tin from inverting qice eqn in original script
 do l = 0,nilyr2-1
@@ -311,7 +318,7 @@ end do
 ;************************************************
 
 ; set a flag to skip writing the file while debugging
-write_the_file = "yes"
+write_the_file = "no"
 if(write_the_file .eq. "yes")then
 
 setfileoption("nc","format","LargeFile")
@@ -479,7 +486,7 @@ end if
   delete(Tin)
   delete(salinz)
  end if ; file is present
-end do ; ndates
+;end do ; ndates
 ;end if
 
 print ("The END")

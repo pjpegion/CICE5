@@ -152,6 +152,15 @@ begin
              /)
    ;print(veclist)
 
+   ; define an axis for the depths of isothermal surfaces
+         z_T = (/2.5, 5.0, 10.0, 15.0, 20.0, 25.0, 28.0/)
+   z_T@units = "degC"
+       z_T!0 = "z_T"
+         nTd = dimsizes(z_T)
+   ; a variable list for the depth of z_T isotherms 
+   isoTvar = (/ (/"dp_isoT_sfc", "Ct", "bilinear", "3"/) \
+              /)
+
    begTime = get_cpu_time()
 ;----------------------------------------------------------------------
 ; make a list of the directories and files from the run 
@@ -261,6 +270,11 @@ begin
     rgmask2d = where(rgmask2d .gt. 0.0, rgmask2d@_FillValue, 1.0)
     rgmask3d = where(rgmask3d .gt. 0.0, rgmask3d@_FillValue, 1.0)
 
+    ; conformed depth array 
+    depth = tofloat(conform_dims(dimsizes(ocnf[0]->temp), z_l, 1))
+    copy_VarCoords(ocnf[0]->temp,depth)
+    printVarSummary(depth)
+
 ;----------------------------------------------------------------------
 ; loop over each file in the ocnfilelist
 ;----------------------------------------------------------------------
@@ -363,6 +377,13 @@ begin
      end do
     end do
  
+   ; the depth of the isotherm variable
+    varname = isoTvar(0)
+      odims = (/"time", "z_T", "lat", "lon"/)
+    ;print("creating variable "+varname+" in file")
+    filevardef(outcdf, varname, "float", odims) 
+    delete(odims)
+
     ; explicitly exit file definition mode.
     setfileoption(outcdf,"DefineMode",False)
 
@@ -503,6 +524,53 @@ begin
       delete([/vecnames,vecgrids,vecmeth,vecdims/])
     ; nv, loop over number of vector pairs
     end do
+
+;----------------------------------------------------------------------
+;
+;----------------------------------------------------------------------
+
+    varname = isoTvar(0)
+    vargrid = isoTvar(1)
+    varmeth = isoTvar(2)
+    vardims = isoTvar(3)
+
+    ocnvar = ocnf[ii]->temp
+    ; interpolate to specific [constant] temp levels
+    ; here we interpolate depth to the field ocnvar at
+    ; levels z_T 
+    dpisoT = int2p_n_Wrap(ocnvar,depth,z_T,0,1)
+    dpisoT@long_name = "depth of the isothermal surface"
+    dpisoT@units     = "m"
+
+    ; a mask for where dpisoT is missing (ie, not found)
+       maskT = where(ismissing(dpisoT), 1.0, 0.0)
+    wgtsfile = nemsrc+"tripole.mx025.Ct.to."+dsttype+dstgrds(jj)+".bilinear.nc"
+     rgmaskT = ESMF_regrid_with_weights(maskT, wgtsfile,False)
+    ; create the interpolation mask
+    rgmaskT = where(rgmaskT .gt. 0.0, rgmaskT@_FillValue, 1.0)
+
+    ; testfile = "masks_"+dstgrds(jj)+".nc"
+    ; system("/bin/rm -f "+testfile)
+     ; create
+    ; testcdf = addfile(testfile,"c")
+    ; testcdf->rgmaskT = rgmaskT
+    ; testcdf->maskT = maskT
+     ; close
+    ; delete(testcdf)
+
+    ; remap the depth of the isotherm fields
+       rgtt = ESMF_regrid_with_weights(dpisoT,wgtsfile,False)
+    ; mask
+       rgtt = where(ismissing(rgmaskT),dpisoT@_FillValue,rgtt)
+
+    ; enter file definition mode to add variable attributes
+    setfileoption(outcdf,"DefineMode",True)
+    filevarattdef(outcdf, varname, rgtt)
+    setfileoption(outcdf,"DefineMode",False)
+
+    outcdf->$varname$   = (/rgtt/)
+
+    delete([/ocnvar, dpisoT, maskT, rgmaskT, rgtt/])
 
 ;----------------------------------------------------------------------
 ; close the outcdf and continue through filelist

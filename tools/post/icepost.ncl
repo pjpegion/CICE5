@@ -31,7 +31,7 @@ begin
    varlist = (/ (/     "hi_h", "Ct", "bilinear"/) \
                ,(/     "hs_h", "Ct", "bilinear"/) \
                ,(/   "Tsfc_h", "Ct", "bilinear"/) \
-               ,(/   "aice_h", "Ct", "conserve"/) \
+               ,(/   "aice_h", "Ct", "bilinear"/) \
                ,(/    "sst_h", "Ct", "bilinear"/) \
              /)
      dims = dimsizes(varlist)

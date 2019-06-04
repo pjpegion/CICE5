@@ -22,7 +22,7 @@
 ; the script associates the thickness categories between SIS2 and CICE5 1:1
 ; ignoring the differences in category thickness definitions
 ;
-; this code is a batch job version of the converstion which will
+; this code is a batch job version of the conversion which will
 ; list all files and loop over each
 ;************************************************
 begin
@@ -140,6 +140,11 @@ use_lint = False
     sice = new((/nilyr2,ncat,nj,ni/),double)
      Tin = new((/nilyr2,ncat,nj,ni/),double)
 
+   aicen = 0.0
+    qice = 0.0
+    sice = 0.0
+     Tin = 0.0
+
 ;************************************************
 ; Retrieve SIS2 variables 
 ; SIS2 variables are stored with time dimension
@@ -245,6 +250,7 @@ do l = 0,nilyr2-1
    qice(l,:,:,:) = rhoi*cp_ice*Tin(l,:,:,:) - rhoi*Lfresh
    qice(l,:,:,:) = where(vicen .gt. 0.d0, qice(l,:,:,:), 0.d0)
 end do
+
 ;ii = 706-1
 ;jj = 155-1
 ;print("CICE5 Qice")
@@ -254,6 +260,9 @@ do l=0,nsnwlyr-1
    qsno(l,:,:,:) = -rhos*(Lfresh - cp_ice*Tsfcn(:,:,:))
    qsno(l,:,:,:) = where(vsnon .gt. 0.d0, qsno(l,:,:,:), 0.0)
 end do
+
+qice = where(ismissing(qice), 0.0, qice)
+qsno = where(ismissing(qsno), 0.0, qsno)
 
 ;************************************************
 ; SIS2 restart has missing values but no attribute for it
@@ -288,9 +297,16 @@ end do
   uvel = where(ismissing(uvel), 0.0d0,   uvel)
 
 ; remove non-ice points
-  uvel = where(dim_sum_n(aicen,0) .eq. 0.0d0, 0.0d0,  uvel)
-  vvel = where(dim_sum_n(aicen,0) .eq. 0.0d0, 0.0d0,  vvel)
+   uvel = where(dim_sum_n(aicen,0) .eq. 0.0d0, 0.0d0,  uvel)
+   vvel = where(dim_sum_n(aicen,0) .eq. 0.0d0, 0.0d0,  vvel)
 
+aice = conform_dims(dimsizes(vicen),dim_sum_n(aicen,0),(/1,2/))
+
+do k = 0,ncat-1
+  vicen = where(aice .eq. 0.0d0, 0.0d0, vicen)
+  vsnon = where(aice .eq. 0.0d0, 0.0d0, vsnon)
+  Tsfcn = where(aice .eq. 0.0d0, 0.0d0, Tsfcn)
+end do
 ;************************************************
 ; Initialize these CICE5 variables to zero
 ;************************************************

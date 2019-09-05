@@ -859,7 +859,7 @@ module cice_cap_mod
           swidf  (i,j,iblk) = dataPtr_swif   (i1,j1,iblk)  ! downwelling shortwave flux, nir dif
           fsw(i,j,iblk) = swvdr(i,j,iblk)+swvdf(i,j,iblk)+swidr(i,j,iblk)+swidf(i,j,iblk)
           frain  (i,j,iblk) = dataPtr_lprec  (i1,j1,iblk)  ! flux of rain (liquid only)
-          fsnow  (i,j,iblk) = dataPtr_fprec  (i1,j1,iblk)  ! flux of frozen precip ! fprec is all junk values from med, no src
+          fsnow  (i,j,iblk) = dataPtr_fprec  (i1,j1,iblk)  ! flux of frozen precip
           sss    (i,j,iblk) = dataPtr_sss    (i1,j1,iblk)  ! sea surface salinity (maybe for mushy layer)
           sst    (i,j,iblk) = dataPtr_sst    (i1,j1,iblk) - 273.15  ! sea surface temp (may not be needed?)
           frzmlt (i,j,iblk) = dataPtr_fmpot  (i1,j1,iblk)
@@ -1434,19 +1434,15 @@ module cice_cap_mod
     call fld_list_add(fldsToIce_num, fldsToIce, "mean_fprec_rate"               , "will provide")
     call fld_list_add(fldsToIce_num, fldsToIce, "sea_surface_temperature"       , "will provide")
     call fld_list_add(fldsToIce_num, fldsToIce, "s_surf"                        , "will provide")
-    call fld_list_add(fldsToIce_num, fldsToIce, "sea_lev"                       , "will provide")
     call fld_list_add(fldsToIce_num, fldsToIce, "sea_surface_slope_zonal"       , "will provide")
     call fld_list_add(fldsToIce_num, fldsToIce, "sea_surface_slope_merid"       , "will provide")
     call fld_list_add(fldsToIce_num, fldsToIce, "ocn_current_zonal"             , "will provide")
     call fld_list_add(fldsToIce_num, fldsToIce, "ocn_current_merid"             , "will provide")
     call fld_list_add(fldsToIce_num, fldsToIce, "freezing_melting_potential"    , "will provide")
-    call fld_list_add(fldsToIce_num, fldsToIce, "mixed_layer_depth"             , "will provide")
-    call fld_list_add(fldsToIce_num, fldsToIce, "mean_zonal_moment_flx"         , "will provide")
-    call fld_list_add(fldsToIce_num, fldsToIce, "mean_merid_moment_flx"         , "will provide")
-    call fld_list_add(fldsToIce_num, fldsToIce, "inst_surface_height"           , "will provide")
-    call fld_list_add(fldsToIce_num, fldsToIce, "inst_temp_height2m"            , "will provide")
-    call fld_list_add(fldsToIce_num, fldsToIce, "inst_spec_humid_height2m"      , "will provide")
     call fld_list_add(fldsToIce_num, fldsToIce, "air_density_height_lowest"     , "will provide")
+! this field is not used; however something about it being the 2nd field listed as 'toice' in 
+! nems mediator requires it to be present
+    call fld_list_add(fldsToIce_num, fldsToIce, "inst_temp_height2m"            , "will provide")
 
 !--------- export fields from Sea Ice -------------
 

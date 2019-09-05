@@ -213,6 +213,32 @@
           aice0, aicen, vicen, vsnon, trcrn, aice_init, &
           nt_Tsfc, nt_sice, nt_qice, nt_qsno, uvel, vvel
 
+      ! required for optional call to cleanup_itd for runtype initial
+      use ice_itd, only: cleanup_itd, kitd
+      use ice_state, only: ntrcr, nbtrcr, tr_aero, tr_pond_topo
+      use ice_zbgc_shared, only: flux_bio, first_ice
+      use ice_therm_shared, only: heat_capacity
+
+      use ice_flux, only: fresh, frain, fpond, frzmlt, frazil, frz_onset, &
+          update_ocn_f, fsalt, Tf, salinz, fhocn, faero_ocn, rside, &
+          meltl
+
+      use ice_blocks, only: block, get_block
+      use ice_domain, only: nblocks, blocks_ice
+      use ice_calendar, only : dt
+
+      type (block) :: &
+         this_block      ! block information for current block
+
+      integer(kind=int_kind) :: &
+         ilo,ihi,jlo,jhi ! beginning and end of physical domain
+
+      logical (kind=log_kind) :: &
+         l_stop          ! if true, abort model
+
+      integer (kind=int_kind) :: &
+         istop, jstop    ! indices of grid cell where model aborts
+
       character (*), optional :: ice_ic
 
       ! local variables
@@ -471,6 +497,41 @@
       !-----------------------------------------------------------------
 !!!      call cleanup_itd
 
+      if (trim(runtype) == 'initial' .and. trim(runid) == 'cpcice') then
+
+       if (my_task == master_task) &
+          write(nu_diag,*) 'CPC ice ICs: Adding call to cleanup_itd'
+      !-----------------------------------------------------------------
+      ! DLW (08/20/19) added for CPC ice initial condition restarts 
+      !-----------------------------------------------------------------
+
+      do iblk = 1,nblocks
+         this_block = get_block(blocks_ice(iblk),iblk)
+         ilo = this_block%ilo
+         ihi = this_block%ihi
+         jlo = this_block%jlo
+         jhi = this_block%jhi
+
+         call cleanup_itd (nx_block,             ny_block,             &
+                           ilo, ihi,             jlo, jhi,             &
+                           dt,                   ntrcr,                &
+                           aicen   (:,:,:,iblk),                       &
+                           trcrn (:,:,1:ntrcr,:,iblk),                 &
+                           vicen   (:,:,:,iblk), vsnon (:,:,  :,iblk), &
+                           aice0   (:,:,  iblk), aice      (:,:,iblk), &
+                           trcr_depend(1:ntrcr), fpond     (:,:,iblk), &
+                           fresh   (:,:,  iblk), fsalt     (:,:,iblk), &
+                           fhocn   (:,:,  iblk),                       &
+                           faero_ocn(:,:,:,iblk),tr_aero,              &
+                           tr_pond_topo,         heat_capacity,        &
+                           nbtrcr,               first_ice(:,:,:,iblk),&
+                           flux_bio(:,:,1:nbtrcr,iblk),                &
+                           l_stop,                                     &
+                           istop,                jstop)
+
+      end do
+      
+      end if
       !-----------------------------------------------------------------
       ! compute aggregate ice state and open water area
       !-----------------------------------------------------------------

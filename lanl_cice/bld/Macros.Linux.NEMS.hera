@@ -1,5 +1,5 @@
 #==============================================================================
-# Makefile macros for "Theia" a NOAA Linux Cluster
+# Makefile macros for "hera" a NOAA Linux Cluster
 #==============================================================================
 # For use with intel compiler with IntelMPI
 #==============================================================================
@@ -31,15 +31,13 @@ PIO_CONFIG_OPTS:= --enable-filesystem-hints=gpfs
 
 PNETCDF_PATH := $(PNETCDF)
 
-LAPACK_LIBDIR := /glade/apps/opt/lapack/3.4.2/intel/12.1.5/lib
-
 INCLDIR := $(INCLDIR)
 
 LIB_NETCDF := $(NETCDF_PATH)/lib
 LIB_PNETCDF := $(PNETCDF_PATH)/lib
 LIB_MPI := $(IMPILIBDIR)
 
-SLIBS   := -L$(LIB_NETCDF) -lnetcdf -L$(LAPACK_LIBDIR) -llapack -lblas
+SLIBS   := -L$(LIB_NETCDF) -lnetcdf
 
 SCC:= icc 
 
@@ -78,7 +76,7 @@ endif
 
 ### if using parallel I/O, load all 3 libraries.  PIO must be first!
 ifeq ($(IO_TYPE), pio)
-   PIO_PATH:=/glade/u/home/jedwards/pio1_6_5/pio
+   #PIO_PATH:=/glade/u/home/jedwards/pio1_6_5/pio
    INCLDIR += -I$(PIO_PATH)
    SLIBS   := $(SLIBS) -L$(PIO_PATH) -lpio
 

@@ -16,10 +16,10 @@ FFLAGS_DEBUG := -g -O0 -fp-model precise -convert big_endian -assume byterecl -f
 FFLAGS_OPT   := -O2 -fp-model precise -convert big_endian -assume byterecl -ftz -traceback   -xHost -I$(NETCDF)/include
 FFLAGS_NOOPT:= -O0
 
-ifdef DEBUG
-FFLAGS += $(FFLAGS_DEBUG)
+ifeq ($(DEBUG),Y)
+  FFLAGS += $(FFLAGS_DEBUG)
 else
-FFLAGS += $(FFLAGS_OPT)
+  FFLAGS += $(FFLAGS_OPT)
 endif
 
 ifeq ($(COMMDIR), mpi)

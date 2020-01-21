@@ -4,8 +4,6 @@
 # For use with intel compiler with IntelMPI
 #==============================================================================
 
-DEBUG=  
-
 CPP        := fpp
 CPPDEFS    := -DFORTRANUNDERSCORE -DNO_R16 -DHAVE_F2008_CONTIGUOUS -DLINUX -DCPRINTEL -DCICE_NEMS
 CFLAGS     := -c -O2 -fp-model precise   -xHost
@@ -22,10 +20,10 @@ else
   FC         := ifort
 endif
 
-ifdef DEBUG
-FFLAGS += $(FFLAGS_DEBUG)
+ifeq ($(DEBUG),Y)
+  FFLAGS += $(FFLAGS_DEBUG)
 else
-FFLAGS += $(FFLAGS_OPT)
+  FFLAGS += $(FFLAGS_OPT)
 endif
 
 MPICC:= mpiicc

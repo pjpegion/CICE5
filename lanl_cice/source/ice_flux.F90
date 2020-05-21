@@ -190,7 +190,8 @@
          albice   , & ! bare ice albedo
          albsno   , & ! snow albedo
          albpnd   , & ! melt pond albedo
-         apeff_ai     ! effective pond area used for radiation calculation
+         apeff_ai , & ! effective pond area used for radiation calculation
+         snowfrac     ! snow fraction used in radiation
 
       real (kind=dbl_kind), &
          dimension(nx_block,ny_block,max_blocks,max_nstrm), target, public :: &
@@ -209,6 +210,9 @@
          fswthruvdf, & ! vis dif shortwave penetrating to ocean (W/m^2)
          fswthruidr, & ! nir dir shortwave penetrating to ocean (W/m^2)
          fswthruidf    ! nir dif shortwave penetrating to ocean (W/m^2)
+
+      real (kind=dbl_kind), dimension (:,:,:,:), allocatable, public :: &
+         fswthrun_ai ! per-category fswthru * ai (W/m^2)
 
       real (kind=dbl_kind), &
         dimension (nx_block,ny_block,max_aero,max_blocks), target, public :: &

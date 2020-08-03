@@ -1135,6 +1135,7 @@ module cice_cap_mod
           ss_tltx(i,j,iblk) = dataPtr_sssz   (i1,j1,iblk)
           ss_tlty(i,j,iblk) = dataPtr_sssm   (i1,j1,iblk)
 #endif
+          Tf     (i,j,iblk) = -depressT*sss(i,j,iblk)
        enddo
        enddo
     enddo

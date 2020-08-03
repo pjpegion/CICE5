@@ -117,8 +117,7 @@
          R_pnd ,   & ! ponded ice tuning parameter; +1 > 1sig increase in albedo
          R_snw ,   & ! snow tuning parameter; +1 > ~.01 change in broadband albedo
          dT_mlt,   & ! change in temp for non-melt to melt snow grain radius change (C)
-         rsnw_mlt, & ! maximum melting snow grain radius (10^-6 m)
-         kalg        ! algae absorption coefficient for 0.5 m thick layer
+         rsnw_mlt    ! maximum melting snow grain radius (10^-6 m)
 
       real (kind=dbl_kind), parameter, public :: &
          hi_ssl = 0.050_dbl_kind, & ! ice surface scattering layer thickness (m)
@@ -130,6 +129,9 @@
 
       real (kind=dbl_kind) :: &
          exp_min         ! minimum exponential value
+
+      real (kind=dbl_kind), parameter :: &
+         kalg  = 0.000_dbl_kind ! algae absorption coefficient for 0.5 m thick layer
 
 !=======================================================================
 

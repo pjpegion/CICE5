@@ -15,8 +15,8 @@
 #setenv RES mx5 ; setenv GRID 720x410
 #setenv RES mx2 ; setenv GRID 1500x1099
 
-setenv RES mx025
-setenv NEMS_GRID T126_mx025
+setenv RES mx100
+setenv NEMS_GRID T128_mx100
 echo "NEMS_GRID = $NEMS_GRID "
 if ($?NEMS_GRID) then
   if ($NEMS_GRID =~ *col*) setenv RES col
@@ -24,6 +24,7 @@ if ($?NEMS_GRID) then
   if ($NEMS_GRID =~ *nx1*) setenv RES nx1
   if ($NEMS_GRID =~ *gx1*) setenv RES gx1
   if ($NEMS_GRID =~ *tx1*) setenv RES tx1
+  if ($NEMS_GRID =~ *mx1*) setenv RES mx100
   if ($NEMS_GRID =~ *mx5*) setenv RES mx5
   if ($NEMS_GRID =~ *mx025*) setenv RES mx025
   if ($NEMS_GRID =~ *mx2*) setenv RES mx2
@@ -32,9 +33,11 @@ endif
 if ($RES == col) setenv GRID 5x5
 if ($RES == gx3) setenv GRID 100x116
 if ($RES == nx1) setenv GRID 360x200
+if ($RES == mx100) setenv GRID 360x320
 if ($RES == gx1) setenv GRID 320x384
 if ($RES == tx1) setenv GRID 360x240
-if ($RES == mx5) setenv GRID 720x410
+#if ($RES == mx5) setenv GRID 720x410
+if ($RES == mx5) setenv GRID 720x576
 if ($RES == mx025) setenv GRID 1440x1080
 if ($RES == mx2) setenv GRID 1500x1099
 
@@ -74,10 +77,21 @@ if ($RES == 'nx1') then   # for column configuration:
    setenv NSNWLYR    1       # number of vertical layers in the snow
    setenv NICECAT    5       # number of ice thickness categories
 endif
+if ($RES == 'mx100') then   # for column configuration:
+#   setenv NTASK     10      # total number of processors
+#   setenv BLCKX     72       # x-dimension of blocks ( not including )
+   setenv NTASK      8      # total number of processors
+   setenv BLCKX     90       # x-dimension of blocks ( not including )
+   setenv BLCKY    160       # y-dimension of blocks (  ghost cells  )
+   setenv NICELYR    7       # number of vertical layers in the ice
+   setenv NSNWLYR    1       # number of vertical layers in the snow
+   setenv NICECAT    5       # number of ice thickness categories
+endif
 if ($RES == 'mx5') then   # for column configuration:
    setenv NTASK     20       # total number of processors
    setenv BLCKX     72       # x-dimension of blocks ( not including )
-   setenv BLCKY    205       # y-dimension of blocks (  ghost cells  )
+   setenv BLCKY    288       # y-dimension of blocks (  ghost cells  )
+   #setenv BLCKY    205       # y-dimension of blocks (  ghost cells  )
    setenv NICELYR    7       # number of vertical layers in the ice
    setenv NSNWLYR    1       # number of vertical layers in the snow
    setenv NICECAT    5       # number of ice thickness categories

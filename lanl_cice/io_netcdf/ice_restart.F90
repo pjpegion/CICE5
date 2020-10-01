@@ -208,6 +208,7 @@
 
          call define_rest_field(ncid,'uvel',dims)
          call define_rest_field(ncid,'vvel',dims)
+         call define_rest_field(ncid,'coszen',dims)
 
          call define_rest_field(ncid,'scale_factor',dims)
          call define_rest_field(ncid,'swvdr',dims)
@@ -395,6 +396,7 @@
       use ice_domain_size, only: max_blocks, ncat
       use ice_fileunits, only: nu_diag
       use ice_read_write, only: ice_read, ice_read_nc
+      use ice_communicate, only: my_task, master_task
 
       integer (kind=int_kind), intent(in) :: &
            nu            , & ! unit number (not used for netcdf)
@@ -425,22 +427,37 @@
         varid, &      ! variable id
         status        ! status variable from netCDF routine
 
+      logical (kind=log_kind) :: &
+         restart_ext2   ! temporary value to allow restart_ext for writing
+                        ! but not reading if runtyp = initial
+
       real (kind=dbl_kind), dimension(nx_block,ny_block,max_blocks) :: &
            work2              ! input array (real, 8-byte)
+
+      ! set temporary variable
+      restart_ext2 = restart_ext
+      if(runtype .eq. 'initial' .and. restart_ext)restart_ext2 = .false.
+      if (my_task == master_task)then
+       if(restart_ext2)then
+        write(nu_diag,*)'NOTE: will read ghost cells in restart'
+       else
+        write(nu_diag,*)'NOTE: will not read ghost cells in restart'
+       end if
+      end if
 
       if (restart_format == 'nc') then
          if (present(field_loc)) then
             if (ndim3 == ncat) then
-               if (restart_ext) then
+               if (restart_ext2) then
                   call ice_read_nc(ncid,1,vname,work,diag, &
-                     field_loc=field_loc,field_type=field_type,restart_ext=restart_ext)
+                     field_loc=field_loc,field_type=field_type,restart_ext=restart_ext2)
                else
                   call ice_read_nc(ncid,1,vname,work,diag,field_loc,field_type)
                endif
             elseif (ndim3 == 1) then
-               if (restart_ext) then
+               if (restart_ext2) then
                   call ice_read_nc(ncid,1,vname,work2,diag, &
-                     field_loc=field_loc,field_type=field_type,restart_ext=restart_ext)
+                     field_loc=field_loc,field_type=field_type,restart_ext=restart_ext2)
                else
                   call ice_read_nc(ncid,1,vname,work2,diag,field_loc,field_type)
                endif
@@ -450,14 +467,14 @@
             endif
          else
             if (ndim3 == ncat) then
-               if (restart_ext) then
-                  call ice_read_nc(ncid, 1, vname, work, diag, restart_ext=restart_ext)
+               if (restart_ext2) then
+                  call ice_read_nc(ncid, 1, vname, work, diag, restart_ext=restart_ext2)
                else
                   call ice_read_nc(ncid, 1, vname, work, diag)
                endif
             elseif (ndim3 == 1) then
-               if (restart_ext) then
-                  call ice_read_nc(ncid, 1, vname, work2, diag, restart_ext=restart_ext)
+               if (restart_ext2) then
+                  call ice_read_nc(ncid, 1, vname, work2, diag, restart_ext=restart_ext2)
                else
                   call ice_read_nc(ncid, 1, vname, work2, diag)
                endif

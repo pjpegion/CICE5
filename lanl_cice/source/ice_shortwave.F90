@@ -1,4 +1,4 @@
-!  SVN:$Id$
+!  SVN:$Id: ice_shortwave.F90 861 2014-10-21 16:44:30Z tcraig $
 !=======================================================================
 !
 ! The albedo and absorbed/transmitted flux parameterizations for
@@ -51,7 +51,6 @@
       use ice_communicate, only: my_task
 
       implicit none
-      save
 
       private
       public :: init_shortwave, run_dEdd, shortwave_ccsm3
@@ -108,13 +107,17 @@
          public :: &
          fswpenln        ! visible SW entering ice layers (W m-2)
 
+      real (kind=dbl_kind), dimension (nx_block,ny_block,ncat,max_blocks), &
+         public :: &
+         snowfracn       ! Category snow fraction used in radiation
+
       ! dEdd tuning parameters, set in namelist
       real (kind=dbl_kind), public :: &
-         R_ice , & ! sea ice tuning parameter; +1 > 1sig increase in albedo
-         R_pnd , & ! ponded ice tuning parameter; +1 > 1sig increase in albedo
-         R_snw , & ! snow tuning parameter; +1 > ~.01 change in broadband albedo
-         dT_mlt, & ! change in temp for non-melt to melt snow grain radius change (C)
-         rsnw_mlt  ! maximum melting snow grain radius (10^-6 m)
+         R_ice ,   & ! sea ice tuning parameter; +1 > 1sig increase in albedo
+         R_pnd ,   & ! ponded ice tuning parameter; +1 > 1sig increase in albedo
+         R_snw ,   & ! snow tuning parameter; +1 > ~.01 change in broadband albedo
+         dT_mlt,   & ! change in temp for non-melt to melt snow grain radius change (C)
+         rsnw_mlt    ! maximum melting snow grain radius (10^-6 m)
 
       real (kind=dbl_kind), parameter, public :: &
          hi_ssl = 0.050_dbl_kind, & ! ice surface scattering layer thickness (m)
@@ -125,7 +128,10 @@
          hp0    = 0.200_dbl_kind    ! pond depth below which transition to bare ice
 
       real (kind=dbl_kind) :: &
-         exp_min              ! minimum exponential value
+         exp_min         ! minimum exponential value
+
+      real (kind=dbl_kind), parameter :: &
+         kalg  = 0.000_dbl_kind ! algae absorption coefficient for 0.5 m thick layer
 
 !=======================================================================
 
@@ -142,7 +148,8 @@
       use ice_flux, only: alvdf, alidf, alvdr, alidr, &
                           alvdr_ai, alidr_ai, alvdf_ai, alidf_ai, &
                           swvdr, swvdf, swidr, swidf, &
-                          albice, albsno, albpnd, apeff_ai, albcnt, coszen, fsnow
+                          albice, albsno, albpnd, albcnt, coszen, fsnow, &
+                          apeff_ai, snowfrac
       use ice_orbital, only: init_orbit
       use ice_state, only: aicen, vicen, vsnon, trcrn, nt_Tsfc
       use ice_blocks, only: block, get_block
@@ -161,36 +168,56 @@
          ilo,ihi,jlo,jhi, & ! beginning and end of physical domain
          n               ! thickness category index
 
-      real (kind=dbl_kind) :: cszn ! counter for history averaging
+      real (kind=dbl_kind) :: cszn,netsw ! counter for history averaging
 
       type (block) :: &
          this_block      ! block information for current block
 
-      !$OMP PARALLEL DO PRIVATE(iblk,i,j)
-      do iblk=1,nblocks
-      do j = 1, ny_block
-      do i = 1, nx_block
-         alvdf(i,j,iblk) = c0
-         alidf(i,j,iblk) = c0
-         alvdr(i,j,iblk) = c0
-         alidr(i,j,iblk) = c0
-         alvdr_ai(i,j,iblk) = c0
-         alidr_ai(i,j,iblk) = c0
-         alvdf_ai(i,j,iblk) = c0
-         alidf_ai(i,j,iblk) = c0
-      enddo
-      enddo
-      enddo
+      !$OMP PARALLEL DO PRIVATE(iblk,i,j,n)
+      do iblk = 1, nblocks
+         do j = 1, ny_block
+         do i = 1, nx_block
+            alvdf(i,j,iblk) = c0
+            alidf(i,j,iblk) = c0
+            alvdr(i,j,iblk) = c0
+            alidr(i,j,iblk) = c0
+            alvdr_ai(i,j,iblk) = c0
+            alidr_ai(i,j,iblk) = c0
+            alvdf_ai(i,j,iblk) = c0
+            alidf_ai(i,j,iblk) = c0
+         enddo
+         enddo
+
+         ! Initialize
+         do n = 1, ncat
+         do j = 1, ny_block
+         do i = 1, nx_block
+            alvdrn(i,j,n,iblk) = c0
+            alidrn(i,j,n,iblk) = c0
+            alvdfn(i,j,n,iblk) = c0
+            alidfn(i,j,n,iblk) = c0
+            fswsfcn(i,j,n,iblk) = c0
+            fswintn(i,j,n,iblk) = c0
+            fswthrun(i,j,n,iblk) = c0
+         enddo   ! i
+         enddo   ! j
+         enddo   ! ncat
+
+         fswpenln(:,:,:,:,iblk) = c0
+         Iswabsn(:,:,:,:,iblk) = c0
+         Sswabsn(:,:,:,:,iblk) = c0
+
+      enddo   ! iblk
       !$OMP END PARALLEL DO
 
       if (trim(shortwave) == 'dEdd') then ! delta Eddington
 
-#ifndef CCSMCOUPLED
+#ifndef CESMCOUPLED
          ! These come from the driver in the coupled model.
          call init_orbit       ! initialize orbital parameters
 #endif
          !$OMP PARALLEL DO PRIVATE(iblk,ilo,ihi,jlo,jhi,this_block)
-         do iblk=1,nblocks
+         do iblk = 1, nblocks
 
             this_block = get_block(blocks_ice(iblk),iblk)         
             ilo = this_block%ilo
@@ -213,11 +240,13 @@
                           fswthrun(:,:,:,iblk),                           &
                           fswthrunvdr(:,:,:,iblk),  fswthrunvdf(:,:,:,iblk),  &
                           fswthrunidr(:,:,:,iblk),  fswthrunidf(:,:,:,iblk),  &
-                          fswpenln(:,:,:,:,iblk),  &
+                          fswpenln(:,:,:,:,iblk),                         &
                           Sswabsn(:,:,:,:,iblk), Iswabsn(:,:,:,:,iblk),   &
                           albicen(:,:,:,iblk),   albsnon(:,:,:,iblk),     &
                           albpndn(:,:,:,iblk),   apeffn(:,:,:,iblk),      &
-                          dhsn(:,:,:,iblk),      ffracn(:,:,:,iblk))
+                          snowfracn(:,:,:,iblk), &
+                          dhsn(:,:,:,iblk),      ffracn(:,:,:,iblk),      &
+                          initonly = .true.       )
 
          enddo
          !$OMP END PARALLEL DO
@@ -225,7 +254,7 @@
       else                     ! basic (ccsm3) shortwave
 
          !$OMP PARALLEL DO PRIVATE(iblk,ilo,ihi,jlo,jhi,this_block)
-         do iblk=1,nblocks
+         do iblk = 1, nblocks
 
             this_block = get_block(blocks_ice(iblk),iblk)         
             ilo = this_block%ilo
@@ -261,8 +290,8 @@
       !-----------------------------------------------------------------
 
       !$OMP PARALLEL DO PRIVATE(iblk,i,j,n,ilo,ihi,jlo,jhi,this_block, &
-      !$OMP                     ij,icells,cszn)
-      do iblk=1,nblocks
+      !$OMP                     ij,icells,cszn,netsw,indxi,indxj)
+      do iblk = 1, nblocks
          this_block = get_block(blocks_ice(iblk),iblk)         
          ilo = this_block%ilo
          ihi = this_block%ihi
@@ -295,7 +324,8 @@
                alidr(i,j,iblk) = alidr(i,j,iblk) &
                   + alidrn(i,j,n,iblk)*aicen(i,j,n,iblk)
 
-               if (coszen(i,j,iblk) > puny) then ! sun above horizon
+               netsw = swvdr(i,j,iblk)+swidr(i,j,iblk)+swvdf(i,j,iblk)+swidf(i,j,iblk)
+               if (netsw > puny) then ! sun above horizon
                albice(i,j,iblk) = albice(i,j,iblk) &
                   + albicen(i,j,n,iblk)*aicen(i,j,n,iblk)
                albsno(i,j,iblk) = albsno(i,j,iblk) &
@@ -306,6 +336,8 @@
 
                apeff_ai(i,j,iblk) = apeff_ai(i,j,iblk) &
                   + apeffn(i,j,n,iblk)*aicen(i,j,n,iblk)
+               snowfrac(i,j,iblk) = snowfrac(i,j,iblk) &
+                  + snowfracn(i,j,n,iblk)*aicen(i,j,n,iblk)
             enddo
 
          enddo  ! ncat
@@ -320,13 +352,6 @@
             alidf_ai  (i,j,iblk) = alidf  (i,j,iblk)
             alvdr_ai  (i,j,iblk) = alvdr  (i,j,iblk)
             alidr_ai  (i,j,iblk) = alidr  (i,j,iblk)
-
-            ! for history averaging
-            cszn = c0
-            if (coszen(i,j,iblk) > puny) cszn = c1
-            do n = 1, nstreams
-               albcnt(i,j,iblk,n) = albcnt(i,j,iblk,n) + cszn
-            enddo
          enddo
          enddo
 
@@ -372,21 +397,21 @@
          swidf        ! sw down, near IR, diffuse (W/m^2)
 
       real (kind=dbl_kind), dimension (nx_block,ny_block,ncat), &
-         intent(out) :: &
-         alvdrn      , & ! visible, direct, avg   (fraction)
-         alidrn      , & ! near-ir, direct, avg   (fraction)
-         alvdfn      , & ! visible, diffuse, avg  (fraction)
-         alidfn      , & ! near-ir, diffuse, avg  (fraction)
-         fswsfc      , & ! SW absorbed at ice/snow surface (W m-2)
-         fswint      , & ! SW absorbed in ice interior, below surface (W m-2)
-         fswthru     , & ! SW through ice to ocean (W m-2)
-         fswthruvdr  , & ! visible direct  SW through ice to ocean (W m-2)
-         fswthruvdf  , & ! visible diffuse SW through ice to ocean (W m-2)
-         albin       , & ! bare ice albedo
-         albsn           ! snow albedo
+         intent(inout) :: &
+         alvdrn     , & ! visible, direct, avg   (fraction)
+         alidrn     , & ! near-ir, direct, avg   (fraction)
+         alvdfn     , & ! visible, diffuse, avg  (fraction)
+         alidfn     , & ! near-ir, diffuse, avg  (fraction)
+         fswsfc     , & ! SW absorbed at ice/snow surface (W m-2)
+         fswint     , & ! SW absorbed in ice interior, below surface (W m-2)
+         fswthru    , & ! SW through ice to ocean (W m-2)
+         fswthruvdr , & ! visible direct  SW through ice to ocean (W m-2)
+         fswthruvdf , & ! visible diffuse SW through ice to ocean (W m-2)
+         albin      , & ! bare ice albedo
+         albsn          ! snow albedo
 
       real (kind=dbl_kind), dimension (nx_block,ny_block,nilyr+1,ncat), &
-           intent(out) :: &
+           intent(inout) :: &
          fswpenl      ! SW entering ice layers (W m-2)
 
       real (kind=dbl_kind), dimension (nx_block,ny_block), &
@@ -394,11 +419,11 @@
          coszen       ! cosine(zenith angle)
 
       real (kind=dbl_kind), dimension (nx_block,ny_block,nilyr,ncat), &
-           intent(out) :: &
+           intent(inout) :: &
          Iswabs       ! SW absorbed in particular layer (W m-2)
 
       real (kind=dbl_kind), dimension (nx_block,ny_block,nslyr,ncat), &
-           intent(out) :: &
+           intent(inout) :: &
          Sswabs       ! SW absorbed in particular layer (W m-2)
 
       ! local variables
@@ -903,8 +928,8 @@
 
       real (kind=dbl_kind), dimension (nx_block,ny_block) :: &
          fswpen      , & ! SW penetrating beneath surface (W m-2)
-         fswpenvdr      , & ! SW vis dir penetrating beneath surface (W m-2)
-         fswpenvdf      , & ! SW vis dif penetrating beneath surface (W m-2)
+         fswpenvdr   , & ! SW vis dir penetrating beneath surface (W m-2)
+         fswpenvdf   , & ! SW vis dif penetrating beneath surface (W m-2)
          trantop     , & ! transmitted frac of penetrating SW at layer top
          tranbot         ! transmitted frac of penetrating SW at layer bot
 
@@ -929,8 +954,6 @@
          fswthruvdr(i,j) = c0
          fswthruvdf(i,j) = c0
          fswpen (i,j) = c0
-         fswpenvdr (i,j) = c0
-         fswpenvdf (i,j) = c0
          trantop(i,j) = c0
          tranbot(i,j) = c0
       enddo
@@ -971,7 +994,6 @@
                                 + (c1-alidfns(i,j))*asnow )
 
          swabs   = swabsv + swabsi
-         if (hs <= hs_min) swabs = c0
 
          fswpenvdr(i,j) = swvdr(i,j) * (c1-alvdrni(i,j)) * (c1-asnow) * i0vis
          fswpenvdf(i,j) = swvdf(i,j) * (c1-alvdfni(i,j)) * (c1-asnow) * i0vis
@@ -1087,16 +1109,18 @@
                           fswthrun,            &
                           fswthrunvdr, fswthrunvdf, &
                           fswthrunidr, fswthrunidf, &
-                          fswpenln,  &
+                          fswpenln,            &
                           Sswabsn,  Iswabsn,   &
                           albicen,  albsnon,   &
                           albpndn,  apeffn,    &
-                          dhsn,     ffracn)
+                          snowfracn,           &
+                          dhsn,     ffracn,    &
+                          initonly     )
 
       use ice_calendar, only: dt
       use ice_meltpond_cesm, only: hs0
       use ice_meltpond_topo, only: hp1
-      use ice_meltpond_lvl, only: hs1, pndaspect, snowinfil
+      use ice_meltpond_lvl, only: hs1, pndaspect
       use ice_orbital, only: compute_coszen
       use ice_state, only: ntrcr, nt_Tsfc, nt_alvl, nt_apnd, nt_hpnd, nt_ipnd, &
                            tr_pond_cesm, tr_pond_lvl, tr_pond_topo
@@ -1132,7 +1156,7 @@
       real(kind=dbl_kind), dimension(nx_block,ny_block), intent(out) :: &
            coszen   ! cosine solar zenith angle, < 0 for sun below horizon 
 
-      real(kind=dbl_kind), dimension(nx_block,ny_block,ncat), intent(out) :: &
+      real(kind=dbl_kind), dimension(nx_block,ny_block,ncat), intent(inout) :: &
            alvdrn,   & ! visible direct albedo (fraction)
            alvdfn,   & ! near-ir direct albedo (fraction)
            alidrn,   & ! visible diffuse albedo (fraction)
@@ -1147,16 +1171,20 @@
            albicen,  & ! albedo bare ice 
            albsnon,  & ! albedo snow 
            albpndn,  & ! albedo pond 
-           apeffn      ! effective pond area used for radiation calculation
+           apeffn,   & ! effective pond area used for radiation calculation
+           snowfracn   ! Snow fraction used in radiation
 
-      real(kind=dbl_kind), dimension(nx_block,ny_block,nslyr,ncat), intent(out) :: &
+      real(kind=dbl_kind), dimension(nx_block,ny_block,nslyr,ncat), intent(inout) :: &
            Sswabsn     ! SW radiation absorbed in snow layers (W m-2)
 
-      real(kind=dbl_kind), dimension(nx_block,ny_block,nilyr,ncat), intent(out) :: &
+      real(kind=dbl_kind), dimension(nx_block,ny_block,nilyr,ncat), intent(inout) :: &
            Iswabsn     ! SW radiation absorbed in ice layers (W m-2) 
 
-      real(kind=dbl_kind), dimension(nx_block,ny_block,nilyr+1,ncat), intent(out) :: &
+      real(kind=dbl_kind), dimension(nx_block,ny_block,nilyr+1,ncat), intent(inout) :: &
            fswpenln    ! visible SW entering ice layers (W m-2)
+
+      logical (kind=log_kind), optional :: &
+           initonly    ! flag to indicate init only, default is false
 
       ! local temporary variables
 
@@ -1195,8 +1223,16 @@
          spn         , & ! snow depth on refrozen pond (m)
          tmp             ! 0 or 1
 
+      logical (kind=log_kind) :: &
+         linitonly       ! local initonly value
+
       real (kind=dbl_kind), parameter :: & 
          argmax = c10    ! maximum argument of exponential
+
+      linitonly = .false.
+      if (present(initonly)) then
+         linitonly = initonly
+      endif
 
       exp_min = exp(-argmax)
 
@@ -1243,9 +1279,11 @@
                                       trcrn(:,:,nt_Tsfc,n), fsn, hsn,          &
                                       rhosnwn,             rsnwn)
 
+         apeffn(:,:,n) = c0 ! for history
+         snowfracn(:,:,n) = c0 ! for history
+
          ! set pond properties
          if (tr_pond_cesm) then
-            apeffn(:,:,n) = c0 ! for history
             do ij = 1, icells
                i = indxi(ij)
                j = indxj(ij)
@@ -1260,27 +1298,31 @@
                   fpn(i,j) = (c1 - asnow) * fpn(i,j)
                   hpn(i,j) = pndaspect * fpn(i,j)
                endif
+
+               ! Zero out fraction of thin ponds for radiation only
+               if (hpn(i,j) < hpmin) fpn(i,j) = c0
+
                apeffn(i,j,n) = fpn(i,j) ! for history
             enddo
 
          elseif (tr_pond_lvl) then
-            apeffn(:,:,n) = c0 ! for history
             do ij = 1, icells
                i = indxi(ij)
                j = indxj(ij)
 
                fpn(i,j) = c0  ! fraction of ice covered in pond
                hpn(i,j) = c0  ! pond depth over fpn
+
                ! refrozen pond lid thickness avg over ice
                ! allow snow to cover pond ice
                ipn = trcrn(i,j,nt_alvl,n) * trcrn(i,j,nt_apnd,n) &
                                           * trcrn(i,j,nt_ipnd,n)
                dhs = dhsn(i,j,n) ! snow depth difference, sea ice - pond
-               if (ipn > puny .and. &
+               if (.not. linitonly .and. ipn > puny .and. &
                    dhs < puny .and. fsnow(i,j)*dt > hs_min) &
                    dhs = hsn(i,j) - fsnow(i,j)*dt ! initialize dhs>0
                spn = hsn(i,j) - dhs   ! snow depth on pond ice
-               if (ipn*spn < puny) dhs = c0
+               if (.not. linitonly .and. ipn*spn < puny) dhs = c0
                dhsn(i,j,n) = dhs ! save: constant until reset to 0
 
                ! not using ipn assumes that lid ice is perfectly clear
@@ -1303,7 +1345,7 @@
 
                ! infiltrate snow
                hp = hpn(i,j)
-               if (snowinfil .and. hp > puny) then
+               if (hp > puny) then
                   hs = hsn(i,j)
                   rp = rhofresh*hp/(rhofresh*hp + rhos*hs)
                   if (rp < p15) then
@@ -1318,22 +1360,24 @@
                      hpn(i,j) = hp * tmp
                      fpn(i,j) = fpn(i,j) * tmp
                   endif
-                  fsn(i,j) = min(fsn(i,j), c1-fpn(i,j))
+               endif ! hp > puny
 
-               endif ! snowinfil
+               ! Zero out fraction of thin ponds for radiation only
+               if (hpn(i,j) < hpmin) fpn(i,j) = c0
+
+               fsn(i,j) = min(fsn(i,j), c1-fpn(i,j))
 
                ! endif    ! masking by lid ice
                apeffn(i,j,n) = fpn(i,j) ! for history
             enddo ! ij
 
          elseif (tr_pond_topo) then
-            apeffn(:,:,n) = c0 ! for history
             do ij = 1, icells
                i = indxi(ij)
                j = indxj(ij)
                ! Lid effective if thicker than hp1
                if (trcrn(i,j,nt_apnd,n)*aicen(i,j,n) > puny .and. &
-                    trcrn(i,j,nt_ipnd,n) < hp1) then
+                   trcrn(i,j,nt_ipnd,n) < hp1) then
                   fpn(i,j) = trcrn(i,j,nt_apnd,n)
                else
                   fpn(i,j) = c0
@@ -1344,6 +1388,14 @@
                   fpn(i,j) = c0
                   hpn(i,j) = c0
                endif
+
+               ! Zero out fraction of thin ponds for radiation only
+               if (hpn(i,j) < hpmin) fpn(i,j) = c0
+
+               ! If ponds are present snow fraction reduced to
+               ! non-ponded part dEdd scheme 
+               fsn(i,j) = min(fsn(i,j), c1-fpn(i,j))
+
                apeffn(i,j,n) = fpn(i,j)
             enddo
          else
@@ -1353,11 +1405,13 @@
                                          trcrn(:,:,nt_Tsfc,n),       &
                                          fsn,                 fpn,   &
                                          hpn)
-            apeffn(:,:,n) = fpn(i,j) ! for history
+            apeffn(:,:,n) = fpn(:,:) ! for history
             fpn = c0
             hpn = c0
          endif
          
+         snowfracn(:,:,n) = fsn(:,:) ! for history
+
          call shortwave_dEdd(nx_block,          ny_block,       &
                              ntrcr,             icells,         &
                              indxi,             indxj,          &
@@ -1452,7 +1506,6 @@
 
       real (kind=dbl_kind), dimension (nx_block,ny_block), &
          intent(in) :: &
-         coszen  , & ! cosine of solar zenith angle 
          aice    , & ! concentration of ice 
          vice    , & ! volume of ice 
          hs      , & ! snow depth
@@ -1477,7 +1530,8 @@
          swidf       ! sw down, near IR, diffuse (W/m^2)
 
       real (kind=dbl_kind), dimension (nx_block,ny_block), &
-         intent(out) :: &
+         intent(inout) :: &
+         coszen  , & ! cosine of solar zenith angle 
          alvdr   , & ! visible, direct, albedo (fraction) 
          alvdf   , & ! visible, diffuse, albedo (fraction) 
          alidr   , & ! near-ir, direct, albedo (fraction) 
@@ -1491,15 +1545,15 @@
          fswthruidf     ! SW through snow/bare ice/ponded ice into ocean (W m-2)
  
       real (kind=dbl_kind), dimension (nx_block,ny_block,nilyr+1), &
-         intent(out) :: &
+         intent(inout) :: &
          fswpenl     ! visible SW entering ice layers (W m-2)
 
       real (kind=dbl_kind), dimension (nx_block,ny_block,nslyr), &
-         intent(out) :: &
+         intent(inout) :: &
          Sswabs      ! SW absorbed in snow layer (W m-2)
 
       real (kind=dbl_kind), dimension (nx_block,ny_block,nilyr), &
-         intent(out) :: &
+         intent(inout) :: &
          Iswabs      ! SW absorbed in ice layer (W m-2)
 
       real (kind=dbl_kind), dimension (nx_block,ny_block), &
@@ -1557,6 +1611,8 @@
          aidrl   , & ! near-ir, direct, albedo (fraction) 
          aidfl       ! near-ir, diffuse, albedo (fraction) 
 
+      real (kind=dbl_kind) :: netsw
+
 !-----------------------------------------------------------------------
 
       do j = 1, ny_block
@@ -1608,12 +1664,13 @@
                i = indxi(ij)
                j = indxj(ij)
                vsno = hs(i,j) * aice(i,j)
-               if (coszen(i,j) > puny) then ! sun above horizon
+               netsw = swvdr(i,j)+swidr(i,j)+swvdf(i,j)+swidf(i,j)
+               if (netsw > puny) then ! sun above horizon
                   aero_mp(i,j,na  ) = trcr(i,j,nt_aero-1+na  )*vsno
                   aero_mp(i,j,na+1) = trcr(i,j,nt_aero-1+na+1)*vsno
                   aero_mp(i,j,na+2) = trcr(i,j,nt_aero-1+na+2)*vice(i,j)
                   aero_mp(i,j,na+3) = trcr(i,j,nt_aero-1+na+3)*vice(i,j)
-               endif                  ! aice > 0 and coszen > 0
+               endif                  ! aice > 0 and netsw > 0
             enddo                     ! ij
          enddo      ! na
       endif      ! if aerosols
@@ -1630,7 +1687,9 @@
          i = indxi(ij)
          j = indxj(ij)
          ! sea ice points with sun above horizon
-         if (coszen(i,j) > puny) then
+         netsw = swvdr(i,j)+swidr(i,j)+swvdf(i,j)+swidf(i,j)
+         if (netsw > puny) then
+            coszen(i,j) = max(puny,coszen(i,j))
             ! evaluate sea ice thickness and fraction
             hi(i,j)  = vice(i,j) / aice(i,j)
             fi(i,j)  = c1 - fs(i,j) - fp(i,j)
@@ -1641,7 +1700,7 @@
               indxj_DE(icells_DE) = j 
               ! bare ice
             endif               ! fi > 0
-         endif                  ! coszen > 0
+         endif                  ! netsw > 0
       enddo                     ! ij
 
       ! calculate bare sea ice
@@ -1685,7 +1744,9 @@
          i = indxi(ij)
          j = indxj(ij)
          ! sea ice points with sun above horizon
-         if (coszen(i,j) > puny) then
+         netsw = swvdr(i,j)+swidr(i,j)+swvdf(i,j)+swidf(i,j)
+         if (netsw > puny) then
+            coszen(i,j) = max(puny,coszen(i,j))
             ! snow-covered sea ice points
             if(fs(i,j) > c0) then
               icells_DE = icells_DE + 1
@@ -1693,7 +1754,7 @@
               indxj_DE(icells_DE) = j 
               ! snow-covered ice
             endif               ! fs > 0
-         endif                  ! coszen > 0
+         endif                  ! netsw > 0
       enddo                     ! ij
 
       ! calculate snow covered sea ice
@@ -1738,16 +1799,18 @@
          j = indxj(ij)
          hi(i,j) = c0
          ! sea ice points with sun above horizon
-         if (coszen(i,j) > puny) then
+         netsw = swvdr(i,j)+swidr(i,j)+swvdf(i,j)+swidf(i,j)
+         if (netsw > puny) then
+            coszen(i,j) = max(puny,coszen(i,j))
             hi(i,j)  = vice(i,j) / aice(i,j)
             ! if non-zero pond fraction and sufficient pond depth
-            if( fp(i,j) > puny .and. hp(i,j) > hpmin ) then
+            if( fp(i,j) > c0 ) then
                icells_DE = icells_DE + 1
                indxi_DE(icells_DE) = i
                indxj_DE(icells_DE) = j
                ! ponded ice
             endif               
-         endif                  ! coszen > puny
+         endif                  ! netsw > puny
       enddo                     ! ij
 
       ! calculate ponded ice
@@ -1780,6 +1843,19 @@
          albpnd(i,j) = albpnd(i,j) &
                      + awtvdr*avdrl(i,j) + awtidr*aidrl(i,j) &
                      + awtvdf*avdfl(i,j) + awtidf*aidfl(i,j) 
+      enddo
+
+!     If no incoming shortwave, set albedos to 1.
+      do j = 1, ny_block
+      do i = 1, nx_block
+         netsw = swvdr(i,j)+swidr(i,j)+swvdf(i,j)+swidf(i,j)
+         if (netsw <= puny) then
+            alvdr(i,j) = c1
+            alvdf(i,j) = c1
+            alidr(i,j) = c1
+            alidf(i,j) = c1
+         endif
+      enddo
       enddo
 
       dbug = .false.
@@ -1816,7 +1892,7 @@
                                   alvdr(i,j),alvdf(i,j)
                write(nu_diag,*) ' alidr  alidf = ', &
                                   alidr(i,j),alidf(i,j)
-               write(nu_diag,*) ' fswsfc fswint fswthru  = ', &
+               write(nu_diag,*) ' fswsfc fswint fswthru = ', &
                                   fswsfc(i,j),fswint(i,j),fswthru(i,j)
                write(nu_diag,*) ' fswthruvdr fswthruvdf fswthruidr fswthruidf = ', &
                                   fswthruvdr(i,j),fswthruvdf(i,j), &
@@ -1867,7 +1943,7 @@
                                   fswthru,                 &
                                   fswthruvdr, fswthruvdf,  &
                                   fswthruidr, fswthruidf,  &
-                                  Sswabs, Iswabs, fswpenl)
+                                  Sswabs, Iswabs,   fswpenl)
 
       use ice_therm_shared, only: heat_capacity
       use ice_state, only: tr_aero
@@ -2370,9 +2446,6 @@
          rhoi   = 917.0_dbl_kind,& ! pure ice mass density (kg/m3)
          fr_max = 1.00_dbl_kind, & ! snow grain adjustment factor max
          fr_min = 0.80_dbl_kind, & ! snow grain adjustment factor min
-      ! algae absorption coefficient for 0.5 m thick layer
-         kalg   = 0.60_dbl_kind, & ! for 0.5 m path of 75 mg Chl a / m2
-!cesm turns kalg off         kalg   = 0.00_dbl_kind, & ! for 0.5 m path of 75 mg Chl a / m2
       ! tuning parameters
       ! ice and pond scat coeff fractional change for +- one-sigma in albedo
          fp_ice = 0.15_dbl_kind, & ! ice fraction of scat coeff for + stn dev in alb
@@ -3073,7 +3146,6 @@
             i = indxi_DE(ij)
             j = indxj_DE(ij)
             Iswabs(i,j,k) = Iswabs(i,j,k) + Iabs(ij,k)*fi(i,j)
-
             ! bgc layer 
             fswpenl(i,j,k) = fswpenl(i,j,k) + fthrul(ij,k)* fi(i,j)
             if (k == nilyr) then
@@ -3360,17 +3432,6 @@
  
 !-----------------------------------------------------------------------
 
-      ! initialize all layer apparent optical properties to 0
-      do k = 0, klev
-         rdir  (k) = c0
-         rdif_a(k) = c0
-         rdif_b(k) = c0
-         tdir  (k) = c0
-         tdif_a(k) = c0
-         tdif_b(k) = c0
-         trnlay(k) = c0
-      enddo
-
       ! initialize all output to 0
       do ij = 1, icells_DE
          i = indxi_DE(ij)
@@ -3422,8 +3483,17 @@
          j = indxj_DE(ij)
 
         ! begin main level loop
-        do k=0,klev
+        do k = 0, klev
  
+           ! initialize all layer apparent optical properties to 0
+           rdir  (k) = c0
+           rdif_a(k) = c0
+           rdif_b(k) = c0
+           tdir  (k) = c0
+           tdif_a(k) = c0
+           tdif_b(k) = c0
+           trnlay(k) = c0
+
            ! compute next layer Delta-eddington solution only if total transmission
            ! of radiation to the interface just above the layer exceeds trmin.
       
